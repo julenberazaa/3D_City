@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { init as rapierInit } from "@dimforge/rapier3d-compat";
 import { buildWorld, type ChunkRecord, type ChunkTerrain, type WorldFixture, type WorldModel } from "./world/generator";
 import { prepareFixture } from "./geo/fusion";
+import { loadLiveFixture } from "./data/live";
 import { createOrbitCamera } from "./render/camera";
 import { createRenderer } from "./render/renderer";
 import { createPhysicsWorld, findSpawnPoint } from "./physics/world";
@@ -76,7 +77,22 @@ function attachWorld(scene: THREE.Scene, world: WorldModel): void {
 async function boot(): Promise<void> {
   try {
     await rapierInit();
-    const fixture = prepareFixture(await loadFixture());
+    const params = new URLSearchParams(window.location.search);
+    const bboxParam = params.get("bbox");
+    let fixture: WorldFixture;
+    let sourceLabel = "fixture";
+    if (bboxParam) {
+      const bbox = bboxParam.split(",").map(Number) as [number, number, number, number];
+      if (bbox.length !== 4 || !bbox.every(Number.isFinite)) throw new Error("invalid ?bbox=w,s,e,n");
+      setStatus("Loading live geography");
+      fixture = await loadLiveFixture(bbox, (p) => {
+        if (p.stage === "terrain") setStatus(`Loading terrain ${Math.min(p.done + 1, p.total)}/${p.total}`);
+        else setStatus("Loading tiles");
+      });
+      sourceLabel = "live";
+    } else {
+      fixture = prepareFixture(await loadFixture());
+    }
     setStatus("Generating world");
     const world = buildWorld(fixture);
     setStatus("Preparing physics");
@@ -114,7 +130,7 @@ async function boot(): Promise<void> {
     const updateHud = () => {
       const stats = render.getStats();
       hudEl.textContent = [
-        `${fixture.manifest.name} fixture`,
+        `${fixture.manifest.name} (${sourceLabel})`,
         `buildings: ${fmt(world.counts.buildings)}   roads: ${fmt(world.counts.roads)}   water: ${fmt(world.counts.waterPolys)}`,
         `triangles: ${fmt(stats.triangles)}   draw calls: ${fmt(stats.drawCalls)}`,
         `physics: terrain ${physics.stats.terrainChunks} / buildings ${physics.stats.buildings}   wheels ${latestWheels}/4   ${latestSpeedKmh.toFixed(0)} km/h`,
