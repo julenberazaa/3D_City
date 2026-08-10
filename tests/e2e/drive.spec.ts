@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("game boots and the car drives through the world", async ({ page }) => {
   test.setTimeout(240000);
-  await page.goto("/?bbox=-122.425,37.767,-122.396,37.792");
+  await page.goto("/?fixture=sf-downtown");
   await page.waitForFunction(
     () => document.querySelector("#status")?.textContent?.includes("Ready"),
     { timeout: 120000 },

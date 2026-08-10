@@ -66,9 +66,10 @@ async function getMvtTile(theme: string, z: number, x: number, y: number): Promi
     if (c) await c.put(key, bytes.buffer as ArrayBuffer);
     return bytes;
   } catch (err) {
-    throw new Error(`network: pmtiles fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`, {
-      cause: err,
-    });
+    const msg = err instanceof Error ? err.message : String(err);
+    // A missing tile (data-poor area) is not a network failure: skip it.
+    if (/404|not found|no tile/i.test(msg)) return undefined;
+    throw new Error(`network: pmtiles fetch failed (${url}): ${msg}`, { cause: err });
   }
 }
 

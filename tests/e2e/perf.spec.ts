@@ -14,38 +14,41 @@ test("performance: drive session frame-time/memory capture", async ({ page }) =>
   );
 
   const frames: Array<{ t: number; fps: number }> = [];
-  let lastT = Date.now();
-  const sampler = await page.evaluate(() => {
-    let count = 0;
-    const iv = setInterval(() => {
-      count++;
-      (window as unknown as { __fps?: number }).__fps = count;
-    }, 1000);
-    return () => clearInterval(iv);
-  });
-  void sampler;
+
+  // rAF-based FPS: count render-loop callbacks over a fixed window.
+  const startSampler = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __rAFCount?: number; __rAFStart?: number };
+      w.__rAFCount = 0;
+      w.__rAFStart = performance.now();
+      const tick = () => {
+        w.__rAFCount = (w.__rAFCount ?? 0) + 1;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
 
   await page.keyboard.down("KeyW");
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 10; i++) {
+    await startSampler();
     await page.waitForTimeout(5000);
     const now = Date.now();
-    const elapsed = (now - lastT) / 1000;
-    lastT = now;
     const sample = await page.evaluate(() => {
+      const w = window as unknown as { __rAFCount?: number; __rAFStart?: number };
+      const elapsed = (performance.now() - (w.__rAFStart ?? 0)) / 1000;
+      const fps = elapsed > 0 ? (w.__rAFCount ?? 0) / elapsed : 0;
       const g = (window as unknown as {
         __game: { stream: () => { active: number; physicsChunks: number }; carPos: () => { x: number; y: number; z: number } };
       }).__game;
       const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
-      const r = (window as unknown as { __renderStats?: () => { drawCalls: number; triangles: number; fps: number } }).__renderStats;
-      void r;
       return {
+        fps: Math.round(fps * 10) / 10,
         stream: g.stream(),
         pos: g.carPos(),
         heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : -1,
-        fps: (window as unknown as { __fps?: number }).__fps ?? 0,
       };
     });
-    frames.push({ t: now, fps: sample.fps / elapsed });
+    frames.push({ t: now, fps: sample.fps });
     console.log("sample", i, JSON.stringify(sample));
   }
   await page.keyboard.up("KeyW");

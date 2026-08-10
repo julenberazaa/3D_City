@@ -47,7 +47,7 @@ async function waitForRendered(canvas: Locator, relX: number, relY: number, labe
 
 test("static vertical slice: fixture world boots and renders", async ({ page }) => {
   test.setTimeout(120000);
-  await page.goto("/?bbox=-122.425,37.767,-122.396,37.792");
+  await page.goto("/?fixture=sf-downtown");
   await expect(page.locator("#status")).toContainText("Ready", { timeout: 90000 });
   const hud = await page.locator("#hud");
   await expect(hud).toBeVisible();

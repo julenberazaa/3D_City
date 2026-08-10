@@ -5,9 +5,15 @@ export interface CacheEntry {
   storedAt: number;
 }
 
+export interface CacheRecord {
+  bytes: ArrayBuffer;
+  size: number;
+  storedAt: number;
+}
+
 export interface CacheBackend {
-  get(key: string): Promise<ArrayBuffer | undefined>;
-  put(key: string, bytes: ArrayBuffer): Promise<void>;
+  get(key: string): Promise<CacheRecord | undefined>;
+  put(key: string, record: CacheRecord): Promise<void>;
   delete(key: string): Promise<void>;
   keys(): Promise<string[]>;
 }
@@ -39,10 +45,10 @@ export class ChunkCache {
 
   async get(key: string): Promise<ArrayBuffer | undefined> {
     try {
-      const bytes = await this.backend.get(key);
-      if (bytes) {
+      const rec = await this.backend.get(key);
+      if (rec) {
         this.stats.hits++;
-        return bytes;
+        return rec.bytes;
       }
     } catch {
       // corrupted read: drop and count as miss
@@ -55,13 +61,15 @@ export class ChunkCache {
   async put(key: string, bytes: ArrayBuffer): Promise<void> {
     const size = bytes.byteLength;
     try {
-      await this.backend.put(key, bytes);
+      const existing = await this.backend.get(key);
+      const existingSize = existing?.size ?? 0;
+      await this.backend.put(key, { bytes, size, storedAt: Date.now() });
+      this.stats.sizeBytes += size - existingSize;
+      if (existingSize === 0) this.stats.entries++;
     } catch {
       this.stats.evicted++;
       return;
     }
-    this.stats.sizeBytes += size;
-    this.stats.entries++;
     await this.enforceBudget();
   }
 
@@ -76,8 +84,8 @@ export class ChunkCache {
     const meta: Array<{ key: string; size: number; at: number }> = [];
     for (const k of keys) {
       try {
-        const b = await this.backend.get(k);
-        meta.push({ key: k, size: b?.byteLength ?? 0, at: Number(k.split("|").pop() ?? 0) || Date.now() });
+        const rec = await this.backend.get(k);
+        meta.push({ key: k, size: rec?.size ?? 0, at: rec?.storedAt ?? 0 });
       } catch {
         meta.push({ key: k, size: 0, at: 0 });
       }

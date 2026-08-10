@@ -1,8 +1,8 @@
-import type { CacheBackend } from "./store";
+import type { CacheBackend, CacheRecord } from "./store";
 
 const DB_NAME = "3d-city-cache";
 const STORE = "chunks";
-const VERSION = 1;
+const VERSION = 2;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -22,7 +22,7 @@ function tx(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
 
 /**
  * IndexedDB-backed cache backend for the browser. Values are stored as
- * { key, bytes: ArrayBuffer, storedAt } records.
+ * { key, bytes, size, storedAt } records.
  */
 export function createIndexedDbCacheBackend(): CacheBackend {
   let dbPromise: Promise<IDBDatabase> | null = null;
@@ -32,21 +32,21 @@ export function createIndexedDbCacheBackend(): CacheBackend {
   };
 
   return {
-    async get(key: string): Promise<ArrayBuffer | undefined> {
+    async get(key: string): Promise<CacheRecord | undefined> {
       const d = await db();
       return new Promise((resolve, reject) => {
         const req = tx(d, "readonly").get(key);
         req.onsuccess = () => {
-          const rec = req.result as { bytes?: ArrayBuffer } | undefined;
-          resolve(rec?.bytes);
+          const rec = req.result as CacheRecord | undefined;
+          resolve(rec);
         };
         req.onerror = () => reject(req.error);
       });
     },
-    async put(key: string, bytes: ArrayBuffer): Promise<void> {
+    async put(key: string, record: CacheRecord): Promise<void> {
       const d = await db();
       return new Promise((resolve, reject) => {
-        const rec = { key, bytes, storedAt: Date.now() };
+        const rec = { key, bytes: record.bytes, size: record.size, storedAt: record.storedAt };
         const req = tx(d, "readwrite").put(rec);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);

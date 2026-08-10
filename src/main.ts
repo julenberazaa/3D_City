@@ -11,10 +11,21 @@ import { createControls } from "./input/controls";
 import { prepareFixture, sampleTerrain } from "./geo/fusion";
 import { loadLiveFixture, cacheStats } from "./data/live";
 import { createStreamer } from "./stream/streamer";
+import { z15Grid } from "./data/fixtureBuilder";
 import { buildGazetteerIndex, searchGazetteer, type GazetteerEntry } from "./search/gazetteer";
 import { searchOpenMeteo } from "./search/openMeteo";
 
 export const DEMO_BBOX = "-122.425,37.767,-122.396,37.792";
+const MAX_LIVE_CHUNKS = 64;
+
+function parseBbox(raw: string): [number, number, number, number] | null {
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 4 || !parts.every(Number.isFinite)) return null;
+  const [w, s, e, n] = parts as [number, number, number, number];
+  if (!(w >= -180 && e <= 180 && s >= -90 && n <= 90)) return null;
+  if (w >= e || s >= n) return null;
+  return [w, s, e, n];
+}
 
 const FIXTURE = "sf-downtown";
 const BASE = `/fixtures/${FIXTURE}`;
@@ -90,7 +101,7 @@ async function showSearch(): Promise<void> {
   const input = container.querySelector<HTMLInputElement>("#place-input")!;
   const resultsEl = container.querySelector<HTMLUListElement>("#place-results")!;
   container.querySelector<HTMLButtonElement>("#demo-btn")!.addEventListener("click", () => {
-    window.location.search = `?bbox=${DEMO_BBOX}`;
+    window.location.search = "?fixture=sf-downtown";
   });
   input.focus();
 
@@ -162,15 +173,21 @@ async function boot(): Promise<void> {
     await rapierInit();
     const params = new URLSearchParams(window.location.search);
     const bboxParam = params.get("bbox");
-    if (!bboxParam) {
+    if (!bboxParam && !params.get("fixture")) {
       void showSearch();
       return;
     }
     let fixture: WorldFixture;
     let sourceLabel = "fixture";
-    if (bboxParam) {
-      const bbox = bboxParam.split(",").map(Number) as [number, number, number, number];
-      if (bbox.length !== 4 || !bbox.every(Number.isFinite)) throw new Error("invalid ?bbox=w,s,e,n");
+    if (params.get("fixture")) {
+      fixture = prepareFixture(await loadFixture());
+      sourceLabel = "fixture";
+    } else if (bboxParam) {
+      const bbox = parseBbox(bboxParam);
+      if (!bbox) throw new Error("invalid ?bbox=w,s,e,n (expected w<s? e>w, s<n, within ±180/±90)");
+      const grid = z15Grid(bbox);
+      const chunkCount = (grid.xMax - grid.xMin + 1) * (grid.yMax - grid.yMin + 1);
+      if (chunkCount > MAX_LIVE_CHUNKS) throw new Error(`bbox too large (${chunkCount} chunks > ${MAX_LIVE_CHUNKS})`);
       setStatus("Loading live geography");
       fixture = await loadLiveFixture(bbox, (p) => {
         if (p.stage === "terrain") setStatus(`Loading terrain ${Math.min(p.done + 1, p.total)}/${p.total}`);
@@ -291,14 +308,14 @@ async function boot(): Promise<void> {
       latestWheels = vehicle.wheelsInContact();
       if (followMode) {
         orbit.camera.position.set(
-          latestCarPos.x - fwd.x * 40,
-          latestCarPos.y + 30,
-          latestCarPos.z - fwd.z * 40,
+          latestCarPos.x - fwd.x * 26,
+          latestCarPos.y + 12,
+          latestCarPos.z - fwd.z * 26,
         );
         orbit.camera.lookAt(
-          latestCarPos.x + fwd.x * 12,
-          latestCarPos.y + 2,
-          latestCarPos.z + fwd.z * 12,
+          latestCarPos.x + fwd.x * 16,
+          latestCarPos.y + 2.5,
+          latestCarPos.z + fwd.z * 16,
         );
       }
     });
