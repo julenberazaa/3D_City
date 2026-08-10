@@ -47,6 +47,16 @@ test("game boots and the car drives through the world", async ({ page }) => {
   expect(moved).toBeGreaterThan(5);
   expect(last!.wheels).toBeGreaterThanOrEqual(2);
   expect(last!.speed).toBeGreaterThan(0);
+  // Causality gate: displacement must align with the spawn heading (proves
+  // the throttle drove the car forward instead of rolling/drifting).
+  const spawnHeading = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { headingRad: () => number } }).__game;
+    return g.headingRad();
+  });
+  const forwardDot =
+    ((last!.pos.x - start.x) * Math.sin(spawnHeading) + (last!.pos.z - start.z) * Math.cos(spawnHeading)) /
+    moved;
+  expect(forwardDot).toBeGreaterThan(0.5);
 
   await page.keyboard.down("KeyA");
   await page.waitForTimeout(2000);

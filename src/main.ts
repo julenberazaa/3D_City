@@ -25,6 +25,7 @@ interface GameDebugHandle {
   status: () => string;
   colliders: () => { terrain: number; buildings: number };
   wheels: () => number;
+  headingRad: () => number;
 }
 
 declare global {
@@ -138,6 +139,7 @@ async function boot(): Promise<void> {
       status: () => status,
       colliders: () => ({ terrain: physics.stats.terrainChunks, buildings: physics.stats.buildings }),
       wheels: () => latestWheels,
+      headingRad: () => vehicle.headingRad(),
     };
 
     let accumulator = 0;

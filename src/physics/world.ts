@@ -64,8 +64,8 @@ function buildingAabbs(fixture: WorldFixture): Aabb[] {
 
 /**
  * Choose a playable spawn: nearest road feature to (0,0) whose point AND the
- * point 12 m ahead along the road are clear of building footprints (3 m
- * margin). Oriented along the road direction; base height from terrain.
+ * point 12 m ahead along the road are clear of building footprints and water
+ * (margins). Oriented along the road direction; base height from terrain.
  * Falls back to the nearest road point.
  */
 export function findSpawnPoint(
@@ -75,9 +75,34 @@ export function findSpawnPoint(
 ): CarSpawnPoint {
   const aabbs = fixture ? buildingAabbs(fixture) : [];
   const margin = 3;
+  const waterMargin = 2;
+  const waterAabbs: Aabb[] = fixture
+    ? fixture.water.flatMap((c) =>
+        c.features.flatMap((f) => {
+          const ring = f.ring;
+          if (!ring || ring.length < 3) return [];
+          let minX = Infinity;
+          let maxX = -Infinity;
+          let minZ = Infinity;
+          let maxZ = -Infinity;
+          for (const p of ring) {
+            minX = Math.min(minX, p[0]);
+            maxX = Math.max(maxX, p[0]);
+            minZ = Math.min(minZ, p[1]);
+            maxZ = Math.max(maxZ, p[1]);
+          }
+          return [{ minX, maxX, minZ, maxZ }];
+        }),
+      )
+    : [];
   const clear = (x: number, z: number): boolean => {
     for (const b of aabbs) {
       if (x >= b.minX - margin && x <= b.maxX + margin && z >= b.minZ - margin && z <= b.maxZ + margin) {
+        return false;
+      }
+    }
+    for (const w of waterAabbs) {
+      if (x >= w.minX - waterMargin && x <= w.maxX + waterMargin && z >= w.minZ - waterMargin && z <= w.maxZ + waterMargin) {
         return false;
       }
     }
@@ -100,12 +125,22 @@ export function findSpawnPoint(
   }
   candidates.sort((a, b) => a.dist - b.dist);
 
-  for (const cand of candidates.slice(0, 2000)) {
-    if (!clear(cand.x, cand.z)) continue;
+  const tryCandidate = (cand: { x: number; z: number; heading: number }): CarSpawnPoint | null => {
+    if (!clear(cand.x, cand.z)) return null;
     const fx = Math.sin(cand.heading);
     const fz = Math.cos(cand.heading);
-    if (!clear(cand.x + fx * 12, cand.z + fz * 12)) continue;
+    if (!clear(cand.x + fx * 12, cand.z + fz * 12)) return null;
     return { x: cand.x, y: sampleTerrain(terrain, cand.x, cand.z) + 0.6, z: cand.z, heading: cand.heading };
+  };
+
+  for (const cand of candidates.slice(0, 2000)) {
+    const ok = tryCandidate(cand);
+    if (ok) return ok;
+  }
+
+  for (const cand of candidates) {
+    const ok = tryCandidate(cand);
+    if (ok) return ok;
   }
 
   const best = candidates[0];
@@ -128,12 +163,9 @@ export interface PhysicsWorld {
 /**
  * Build a Rapier heightfield collider for one terrain chunk.
  *
- * Convention (verified empirically against rapier/parry 0.20 + parry source):
- * - the raw heightfield takes CELL counts (nrows=ncols=size-1) and a heights
- *   matrix of (nrows+1)x(ncols+1) POST values;
  * Convention (verified empirically with ramp sweeps against rapier/parry 0.20):
  * - raw heightfield takes CELL counts (nrows=ncols=size-1) and a heights matrix
- *   of (nrows+1)x(ncols+1) POST values, col-major: element (r,c)=data[r + c*nrows];
+ *   of (nrows+1)x(ncols+1) POST values, col-major: element (r,c)=data[r + c*ncols];
  * - the grid is CENTERED on the collider body: post (r,c) sits at local
  *   x = (c - ncols/2)*step, z = (r - nrows/2)*step (row r advances +z, col c +x);
  * - the render mesh places vertex (i, j) at x = originX + i*step, z = originY - j*step,
@@ -181,7 +213,10 @@ function buildingBoxFor(
   if (hx < 0.3 || hz < 0.3) return null;
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
-  const baseY = sampleTerrain(terrain, cx, cz);
+  let baseY = -Infinity;
+  for (const p of ring) {
+    baseY = Math.max(baseY, sampleTerrain(terrain, p[0], p[1]));
+  }
   const hy = height / 2;
   const body = world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, baseY + hy, cz));
   const desc = descFactory.cuboid(hx, hy, hz);
