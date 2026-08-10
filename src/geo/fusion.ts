@@ -53,11 +53,6 @@ export function stitchTerrainEdges(terrain: ChunkTerrain[]): ChunkTerrain[] {
   if (n === 0) return out;
   const last = n - 1;
 
-  const blendCol = (c: ChunkTerrain, col: number, rowA: number, rowB: number, w: number, v: number): void => {
-    c.heights[rowA]![col] = v;
-    c.heights[rowB]![col] = c.heights[rowB]![col] * (1 - w) + v * w;
-  };
-
   // East-west pairs first, then north-south, then corners: independent axis
   // passes would otherwise break the corner posts of the other axis.
   for (const c of out) {
