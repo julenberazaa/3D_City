@@ -2,6 +2,9 @@
 
 | Req | Module(s) | Test(s) | Runtime evidence | State |
 |---|---|---|---|---|
+| R-004 (pre) | src/geo/terrarium.ts | terrarium.test.ts | vitest 2 green | WP-02a PARTIAL |
+| R-005 (pre) | src/geo/mvt.ts | mvt.test.ts | vitest 3 green | WP-02a PARTIAL |
+| R-010 (pre) | src/geo/projection.ts, src/world/types.ts | projection.test.ts | vitest 6 green | WP-02a PARTIAL |
 | R-001 | src/main.ts | browser smoke e2e | screenshot boot | NOT_STARTED |
 | R-002 | src/search/ | search unit tests | e2e | NOT_STARTED |
 | R-003 | src/loading/ | DOM e2e | video/screens | NOT_STARTED |

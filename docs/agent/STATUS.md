@@ -1,6 +1,6 @@
 # STATUS — Executive Engineering State
 
-Updated: 2026-08-10 (bootstrap)
+Updated: 2026-08-10 (WP-02a geo foundation green)
 
 States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRITICAL
 
@@ -8,7 +8,7 @@ States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRIT
 |---|---|---|---|---|---|---|
 | WP-00 | Env + harness + docs + model lock | ACTIVE | R-001..R-006 | harness smoke | run-id pending | finish harness + baseline |
 | WP-01 | Upstream reuse audit + architecture freeze | PASS | R-007 | audit doc + probes | reports/research + audits 2026-08-10 | WP-02 |
-| WP-02 | Static vertical slice | NOT_STARTED | R-010 | fixture tests | pending | implement |
+| WP-02 | Static vertical slice — WP-02a geo foundation (projection, mvt, terrarium, world types) DONE; slice itself NOT_STARTED | ACTIVE | R-010 | 11 unit tests green (typecheck+lint clean) | tests/unit/projection|mvt|terrarium.test.ts | WP-02b: fixture fetch tool → generator → renderer |
 | WP-03 | Physics vertical slice | NOT_STARTED | R-011 | physics tests | pending | implement |
 | WP-04 | Geo fusion | NOT_STARTED | R-012 | fusion tests | pending | implement |
 | WP-05 | Live data pipeline | NOT_STARTED | R-013 | live+fixture tests | pending | implement |

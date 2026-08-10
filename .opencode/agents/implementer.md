@@ -3,6 +3,7 @@ description: One bounded implementation work package. May edit, install, build, 
 mode: subagent
 model: opencode-go/deepseek-v4-flash
 temperature: 0.2
+steps: 150
 permission:
   task:
     "*": deny
