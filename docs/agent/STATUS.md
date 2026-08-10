@@ -7,7 +7,7 @@ States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRIT
 | ID | SCOPE | STATE | REQUIREMENTS | TESTS | EVIDENCE | NEXT |
 |---|---|---|---|---|---|---|
 | WP-00 | Env + harness + docs + model lock | ACTIVE | R-001..R-006 | harness smoke | run-id pending | finish harness + baseline |
-| WP-01 | Upstream reuse audit + architecture freeze | NOT_STARTED | R-007 | audit doc | pending | research + freeze |
+| WP-01 | Upstream reuse audit + architecture freeze | PASS | R-007 | audit doc + probes | reports/research + audits 2026-08-10 | WP-02 |
 | WP-02 | Static vertical slice | NOT_STARTED | R-010 | fixture tests | pending | implement |
 | WP-03 | Physics vertical slice | NOT_STARTED | R-011 | physics tests | pending | implement |
 | WP-04 | Geo fusion | NOT_STARTED | R-012 | fusion tests | pending | implement |
