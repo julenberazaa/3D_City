@@ -33,10 +33,11 @@
 - Deterministic chunk key: `{dataRelease, chunkId(z15,x,y), generatorVersion, artVersion}`.
 
 ## Chunking / streaming
-- Chunk = one z15 tile ≈ 306 m (0.27° scale at equator). Data zoom: Overture PMTiles
-  maxZoom is 14 (buildings/transportation) and 13 (base) → **overzoom**: fetch z14/z13
-  tiles and bucket features into the z15 chunk grid (verified by probe during WP-02a).
-  Terrain (terrarium) is real z15. State machine:
+- Chunk = one z15 tile ≈ 1223 m at the equator (40075016.686 / 2^15). Data zoom: Overture
+  PMTiles maxZoom is 14 (buildings/transportation) and 13 (base) → **overzoom**: fetch
+  z14/z13 tiles and bucket features into the z15 chunk grid (verified by probe during
+  WP-02b; SF fixture = 16 z15 chunks). Terrain (terrarium) is real z15, sampled 33×33.
+  Finer chunking (z16/z17) may be evaluated for streaming in WP-06. State machine:
   UNSEEN → QUEUED → FETCHING → DECODING → FUSING → GENERATING → GPU_READY → ACTIVE →
   CACHE_ONLY → EVICTED; all stages cancellable.
 - Priority: distance + heading/velocity projection + camera direction + LOD need +

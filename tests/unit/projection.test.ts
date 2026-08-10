@@ -37,7 +37,7 @@ describe("projection mercator", () => {
     const x = webMercatorX(-122.4194);
     const y = webMercatorY(37.7749);
     expect(x).toBeCloseTo(-13627665.27136141, 3);
-    expect(y).toBeCloseTo(14286943.484257927, 3);
+    expect(y).toBeCloseTo(4547675.354388391, 3);
     expect(mercatorXToLon(x)).toBeCloseTo(-122.4194, 6);
     expect(mercatorYToLat(y)).toBeCloseTo(37.7749, 6);
   });
@@ -77,6 +77,7 @@ describe("projection tiles", () => {
     const x = webMercatorX(lon);
     const y = webMercatorY(lat);
     const [tx, ty] = worldToTileXY(x, y, z);
+    expect([tx, ty]).toEqual([5241, 12665]);
     const [west, south, east, north] = tileBounds(z, tx, ty);
     expect(west).toBeLessThanOrEqual(lon);
     expect(east).toBeGreaterThan(lon);

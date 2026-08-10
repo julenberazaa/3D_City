@@ -3,7 +3,7 @@ import { PbfReader } from "pbf";
 export interface MvtFeature {
   id?: number;
   type: "Point" | "LineString" | "Polygon";
-  /** Point/LineString: [x,y] pairs; Polygon: array of closed rings (each ring [x,y] pairs, last == first). */
+  /** Point: [x,y] pairs; LineString: array of lines (each [x,y] pairs); Polygon: array of closed rings (each ring [x,y] pairs, last == first). */
   geometry: number[][] | number[][][];
   properties: Record<string, unknown>;
 }
@@ -137,8 +137,8 @@ function decodeGeometry(commands: number[], type: MvtFeature["type"]): MvtFeatur
     }
   }
   if (current.length > 0) rings.push(current);
-  if (type === "Polygon") return rings;
-  return rings[0] ?? [];
+  if (type === "Point") return rings.map((r) => r[0]);
+  return rings;
 }
 
 export function decodeTile(pbfBytes: Uint8Array): MvtTile {

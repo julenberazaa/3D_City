@@ -14,31 +14,27 @@ function writeGeometry(
 ): void {
   const cmds: number[] = [];
   if (type === "Point") {
-    const [x, y] = rings[0][0];
-    cmds.push(cmd(1, 1), zigzag(x), zigzag(y));
-  } else if (type === "LineString") {
-    const pts = rings[0];
-    cmds.push(cmd(1, 1), zigzag(pts[0][0]), zigzag(pts[0][1]));
-    let px = pts[0][0];
-    let py = pts[0][1];
-    cmds.push(cmd(2, pts.length - 1));
-    for (let i = 1; i < pts.length; i++) {
-      cmds.push(zigzag(pts[i][0] - px), zigzag(pts[i][1] - py));
-      px = pts[i][0];
-      py = pts[i][1];
+    let px = 0;
+    let py = 0;
+    for (const [x, y] of rings.map((r) => r[0])) {
+      cmds.push(cmd(1, 1), zigzag(x - px), zigzag(y - py));
+      px = x;
+      py = y;
     }
   } else {
-    for (const ring of rings) {
-      cmds.push(cmd(1, 1), zigzag(ring[0][0]), zigzag(ring[0][1]));
-      let px = ring[0][0];
-      let py = ring[0][1];
-      cmds.push(cmd(2, ring.length - 1));
-      for (let i = 1; i < ring.length; i++) {
-        cmds.push(zigzag(ring[i][0] - px), zigzag(ring[i][1] - py));
-        px = ring[i][0];
-        py = ring[i][1];
+    let px = 0;
+    let py = 0;
+    for (const pts of rings) {
+      cmds.push(cmd(1, 1), zigzag(pts[0][0] - px), zigzag(pts[0][1] - py));
+      px = pts[0][0];
+      py = pts[0][1];
+      cmds.push(cmd(2, pts.length - 1));
+      for (let i = 1; i < pts.length; i++) {
+        cmds.push(zigzag(pts[i][0] - px), zigzag(pts[i][1] - py));
+        px = pts[i][0];
+        py = pts[i][1];
       }
-      cmds.push(cmd(7, 1));
+      if (type === "Polygon") cmds.push(cmd(7, 1));
     }
   }
   p.writePackedVarint(4, cmds);
@@ -117,7 +113,7 @@ describe("decodeTile", () => {
 
     const line = places?.features[1] as MvtFeature;
     expect(line.type).toBe("LineString");
-    expect(line.geometry).toEqual([[0, 0], [50, 100], [200, 150]]);
+    expect(line.geometry).toEqual([[[0, 0], [50, 100], [200, 150]]]);
 
     const roads = tile.layers.get("roads");
     const polygon = roads?.features[0] as MvtFeature;
@@ -139,5 +135,36 @@ describe("decodeTile", () => {
   it("decodes an empty tile to zero layers", () => {
     const tile = decodeTile(new Uint8Array(0));
     expect(tile.layers.size).toBe(0);
+  });
+
+  it("preserves every line of a MultiLineString", () => {
+    const pbf = new PbfWriter();
+    writeLayer(
+      pbf,
+      "roads",
+      [],
+      [],
+      [{ id: 4, type: "LineString", tags: [], rings: [[[0, 0], [10, 10]], [[20, 0], [30, 5], [40, 5]]] }],
+    );
+    const tile = decodeTile(pbf.finish());
+    const line = tile.layers.get("roads")?.features[0] as MvtFeature;
+    expect(line.geometry).toEqual([
+      [[0, 0], [10, 10]],
+      [[20, 0], [30, 5], [40, 5]],
+    ]);
+  });
+
+  it("preserves every point of a MultiPoint", () => {
+    const pbf = new PbfWriter();
+    writeLayer(
+      pbf,
+      "places",
+      [],
+      [],
+      [{ id: 5, type: "Point", tags: [], rings: [[[5, 5]], [[8, 8]]] }],
+    );
+    const tile = decodeTile(pbf.finish());
+    const point = tile.layers.get("places")?.features[0] as MvtFeature;
+    expect(point.geometry).toEqual([[5, 5], [8, 8]]);
   });
 });

@@ -6,6 +6,20 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["tools/**/*.mjs", "scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        AbortController: "readonly",
+        Buffer: "readonly",
+        clearTimeout: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+        setTimeout: "readonly",
+      },
+    },
+  },
+  {
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "off",

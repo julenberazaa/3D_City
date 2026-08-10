@@ -14,7 +14,7 @@ export function webMercatorX(lon: number): number {
 export function webMercatorY(lat: number): number {
   const sin = Math.sin(toRadians(lat));
   const clamped = Math.max(-0.999999, Math.min(0.999999, sin));
-  return HALF_CIRCUMFERENCE * Math.log((1 + clamped) / (1 - clamped)) * 0.5;
+  return (HALF_CIRCUMFERENCE / Math.PI) * Math.log((1 + clamped) / (1 - clamped)) * 0.5;
 }
 
 /** Web Mercator (EPSG:3857) X in meters to longitude. */
@@ -24,8 +24,8 @@ export function mercatorXToLon(x: number): number {
 
 /** Web Mercator (EPSG:3857) Y in meters to latitude. */
 export function mercatorYToLat(y: number): number {
-  const n = Math.exp((y / HALF_CIRCUMFERENCE) * 2);
-  return toDegrees(Math.asin((n - 1) / (n + 1)));
+  const n = Math.exp(y / (HALF_CIRCUMFERENCE / Math.PI));
+  return toDegrees(Math.asin((n * n - 1) / (n * n + 1)));
 }
 
 /** EPSG:3857 meter X/Y to lon/lat. */
