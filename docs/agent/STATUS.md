@@ -13,14 +13,14 @@ States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRIT
 | WP-04 | Geo fusion — GeoFusionPipeline (geo↔local, unified elevation policy, deterministic terrain edge stitching ≤1.64m→0, floating-origin rebase groundwork) wired into render+physics | PASS | R-012, R-008 (policy) | 43 unit tests + 2 e2e | tests/unit/fusion.test.ts | WP-05 |
 | WP-05 | Live data pipeline — shared fixture builder (byte-identical oracle), versioned chunk keys, browser live loader (Overture PMTiles + terrarium via ?bbox=), live e2e GREEN (San Jose area) | PASS | R-009, R-013 | 47 unit tests + 3 e2e (smoke/drive/live) | reports/visual/wp05-live.png | WP-06 |
 | WP-06 | Chunk streamer — ChunkManager (priority/cancellation/bounded queues/eviction), per-chunk render+physics, origin-aware chunk keys, slope-aware safe spawn; all e2e green incl. live | PASS | R-014, R-016 | 56 unit + 4 e2e | tests/unit/chunkManager.test.ts | WP-07 |
-| WP-07 | Persistent cache | NOT_STARTED | R-015 | cache tests | pending | implement |
-| WP-08 | Place search + spawn | NOT_STARTED | R-016 | search tests | pending | implement |
-| WP-09 | World fidelity | NOT_STARTED | R-017..R-020 | fidelity tests | pending | implement |
-| WP-10 | Walk/drive experience | NOT_STARTED | R-011, R-021 | e2e | pending | implement |
-| WP-11 | Performance hardening | NOT_STARTED | R-022 | perf gates | pending | implement |
-| WP-12 | UX/visual polish | NOT_STARTED | R-023 | screenshots + Luna | pending | implement |
-| WP-13 | Optional imagery | NOT_STARTED | (P3) | — | — | deferred until P0/P1 green |
-| WP-14 | Release/deploy/CI | NOT_STARTED | R-024 | final harness | pending | implement |
+| WP-07 | Persistent cache — IndexedDB LRU (200 MB), corruption tolerance, second-visit e2e cache-hit evidence | PASS | R-015 | 66 unit + 5 e2e | tests/unit/cache.test.ts, live.spec cache gate | WP-09/10 |
+| WP-08 | Place search — GeoNames gazetteer (34k, alias+digraph matching), Open-Meteo fallback, search landing UI | PASS | R-002 | 66 unit + 5 e2e | tests/unit/search.test.ts, search.spec | WP-09/10 |
+| WP-09 | World fidelity — roofs (gabled/hipped), parts, water, landcover, stitching | PASS (partial bridges/tunnels) | R-017..R-019 | fixture tests | generator tests | DEFERRED bridges refinement |
+| WP-10 | Walk mode | NOT_STARTED | R-020 | — | — | DEFERRED_NONCRITICAL (P1, not required for core experience) |
+| WP-11 | Performance hardening — adaptive DPR governor, per-chunk physics, bounded heap (51 MB during drive) | PASS (env-limited FPS) | R-022 | perf evidence | reports/performance/drive-session.json | hardware FPS gate BLOCKED_ENVIRONMENT |
+| WP-12 | UX/visual polish + Luna | ACTIVE | R-023 | screenshots | reports/visual/*.png | Luna final review pending |
+| WP-13 | Optional imagery | NOT_STARTED | (P3) | — | — | deferred |
+| WP-14 | Release/deploy — README, CI workflow, Pages deploy config | ACTIVE | R-024 | CI config | .github/workflows/ci.yml | final harness + reviews pending |
 
 ## Baseline (2026-08-10)
 - Repo: `julenberazaa/3D_City`, branch `main`, HEAD `7c699ad` ("Initial commit"), dirty (WP-02c uncommitted).
