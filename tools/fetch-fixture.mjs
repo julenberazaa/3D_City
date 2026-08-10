@@ -213,6 +213,25 @@ function resampleHeights(data, w, h) {
   return out;
 }
 
+/** Resample only the sub-extent of a parent tile covered by a zoom+1 child tile.
+ * (fx, fy) is the child's fractional offset within the parent (0 or 0.5); `frac` is the
+ * child's fraction of the parent edge (0.5 for a zoom+1 child). Pixel space spans
+ * [fx*(w-1), (fx+frac)*(w-1)] x [fy*(h-1), (fy+frac)*(h-1)], so the missing z15 tile is
+ * reconstructed from the exact region of the z14 parent it overlaps. */
+function resampleHeightsSubExtent(data, w, h, fx, fy, frac) {
+  const out = [];
+  for (let j = 0; j < TERRAIN_GRID; j++) {
+    const row = [];
+    for (let i = 0; i < TERRAIN_GRID; i++) {
+      const u = (fx + (i / (TERRAIN_GRID - 1)) * frac) * (w - 1);
+      const v = (fy + (j / (TERRAIN_GRID - 1)) * frac) * (h - 1);
+      row.push(round2(bilinearSample(data, w, h, u, v)));
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 /** Download + decode a terrarium PNG; undefined if missing or undecodable. */
 async function fetchTerrainPng(z, x, y) {
   const url = TERRARIUM_PATTERN.replace("{z}", z).replace("{x}", x).replace("{y}", y);
@@ -464,7 +483,9 @@ async function main() {
     } else {
       const parent = await fetchTerrainPng(Z14, c.x >> 1, c.y >> 1);
       if (parent) {
-        heightsGrid = resampleHeights(parent.heights, parent.w, parent.h);
+        const fx = (((c.x % 2) + 2) % 2) / 2;
+        const fy = (((c.y % 2) + 2) % 2) / 2;
+        heightsGrid = resampleHeightsSubExtent(parent.heights, parent.w, parent.h, fx, fy, 0.5);
         provenance = "z14-fallback";
         log(`  terrain z14-fallback for ${c.x}/${c.y}`);
       } else {
