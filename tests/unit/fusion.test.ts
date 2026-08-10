@@ -19,10 +19,10 @@ function maxEdgeDelta(terrain: ChunkTerrain[]): { ns: number; ew: number } {
   let ns = 0;
   let ew = 0;
   for (const c of terrain) {
-    const south = byKey.get(`${c.z}-${c.x}-${c.y - 1}`);
-    if (south) {
+    const north = byKey.get(`${c.z}-${c.x}-${c.y - 1}`);
+    if (north) {
       for (let i = 0; i < c.size; i++) {
-        ns = Math.max(ns, Math.abs(c.heights[c.size - 1]![i]! - south.heights[0]![i]!));
+        ns = Math.max(ns, Math.abs(c.heights[0]![i]! - north.heights[c.size - 1]![i]!));
       }
     }
     const east = byKey.get(`${c.z}-${c.x + 1}-${c.y}`);

@@ -75,6 +75,13 @@ test("game boots and the car drives through the world", async ({ page }) => {
   expect(moved).toBeGreaterThan(5);
   expect(last!.wheels).toBeGreaterThanOrEqual(2);
   expect(last!.speed).toBeGreaterThan(0);
+  // Ground-truth gate: the car must sit ON the real terrain (catches misplaced
+  // physics colliders — e.g. everything piled at the world origin).
+  const ground = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { groundHeight: () => number } }).__game;
+    return g.groundHeight();
+  });
+  expect(Math.abs(last!.pos.y - ground)).toBeLessThan(6);
   const windowMoved = Math.hypot(p2.pos.x - p1.x, p2.pos.z - p1.z);
   expect(windowMoved).toBeGreaterThan(1);
   const forwardDot =

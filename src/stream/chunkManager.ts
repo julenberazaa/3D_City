@@ -154,7 +154,7 @@ export class ChunkManager {
       this.generating.delete(key);
       this.counters.generating = this.generating.size;
     }
-    if (cur === "queued" || cur === "fetching" || cur === "generating") this.counters.queued = Math.max(0, this.counters.queued - 1);
+    if (cur === "queued") this.counters.queued = Math.max(0, this.counters.queued - 1);
     this.states.delete(key);
   }
 
@@ -205,12 +205,18 @@ export class ChunkManager {
       added++;
     }
 
-    // Promote queued → fetching (bounded concurrency). The HOST drives the
-    // fetching → generating → active transitions once the work is ready.
-    const fetchSlots = this.config.maxConcurrentFetch - this.fetching.size;
-    for (const key of missing.filter((k) => this.states.get(k) === "queued")) {
+    // Promote queued → fetching (bounded concurrency). Promotion considers ALL
+    // queued chunks each update so queued chunks are never starved when slots
+    // free up. The HOST drives fetching → generating → active transitions.
+    let fetchSlots = this.config.maxConcurrentFetch - this.fetching.size;
+    const queuedKeys = [...this.states.entries()]
+      .filter(([, s]) => s === "queued")
+      .map(([k]) => k)
+      .sort((a, b) => chunkPriority(this.config.origin, b, player) - chunkPriority(this.config.origin, a, player));
+    for (const key of queuedKeys) {
       if (fetchSlots <= 0) break;
       this.setState(key, "queued", "fetching", this.generation.get(key) ?? 0);
+      fetchSlots--;
     }
     return actions;
   }

@@ -4,8 +4,9 @@ import {
   RigidBodyDesc,
   World,
 } from "@dimforge/rapier3d-compat";
-import { createPhysicsWorld, findSpawnPoint, terrainColliderFor } from "../../src/physics/world";
+import { createPhysicsWorld, createStreamingPhysicsWorld, createPhysicsChunk, findSpawnPoint, terrainColliderFor } from "../../src/physics/world";
 import { createCar } from "../../src/physics/vehicle";
+import { chunkKeyOf, chunkCenter } from "../../src/stream/chunkManager";
 import type { ChunkTerrain, WorldFixture } from "../../src/world/generator";
 import { readFixture } from "./fixture-helper";
 
@@ -27,6 +28,32 @@ describe("physics world (rapier)", () => {
     const RAPIER = await import("@dimforge/rapier3d-compat");
     await RAPIER.init();
     expect(RAPIER.version()).toBeTruthy();
+  });
+
+  it("streaming chunk physics is placed at the real chunk location (not origin)", () => {
+    const pw = createStreamingPhysicsWorld(fixture);
+    const spawn = findSpawnPoint(fixture.roads, fixture.terrain, fixture);
+    const key = chunkKeyOf(fixture.manifest.origin, spawn.x, spawn.z);
+    const ph = createPhysicsChunk(pw, key);
+    expect(ph).not.toBeNull();
+    pw.world.step();
+    const terrain = fixture.terrain.find((t) => `${t.x}/${t.y}` === key)!;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of terrain.heights) for (const v of row) {
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    const center = chunkCenter(fixture.manifest.origin, key);
+    const h = raycastHeight(pw.world, center.x + 10, center.z - 10);
+    expect(h).not.toBeNull();
+    // The physics surface must be plausible terrain (stitching may raise values
+    // near seams above the raw chunk max, so use a generous band).
+    expect(h!).toBeGreaterThan(min - 10);
+    expect(h!).toBeLessThan(max + 20);
+    // The heightfield must NOT sit at the world origin: a raycast far from
+    // the chunk must miss the terrain entirely.
+    expect(raycastHeight(pw.world, 0, 0)).toBeNull();
   });
 
   it("heightfield collider convention: synthetic 3x3 peak is hit where expected", () => {

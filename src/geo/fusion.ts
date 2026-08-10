@@ -53,35 +53,13 @@ export function stitchTerrainEdges(terrain: ChunkTerrain[]): ChunkTerrain[] {
   if (n === 0) return out;
   const last = n - 1;
 
-  const blendRow = (c: ChunkTerrain, row: number, colA: number, colB: number, w: number, v: number): void => {
-    c.heights[row]![colA] = v;
-    c.heights[row]![colB] = c.heights[row]![colB] * (1 - w) + v * w;
-  };
   const blendCol = (c: ChunkTerrain, col: number, rowA: number, rowB: number, w: number, v: number): void => {
     c.heights[rowA]![col] = v;
     c.heights[rowB]![col] = c.heights[rowB]![col] * (1 - w) + v * w;
   };
 
-  // North-south pairs: c is the north chunk (y), s = c's south neighbor (y-1).
-  for (const c of out) {
-    const s = byKey.get(chunkKey(c.z, c.x, c.y - 1));
-    if (!s) continue;
-    for (let i = 0; i < n; i++) {
-      const a = c.heights[last]![i]!;
-      const b = s.heights[0]![i]!;
-      if (Math.abs(a - b) < 1e-6) continue;
-      const v = (a + b) / 2;
-      blendRow(c, last, i, i === 0 ? 0 : i, 1, v);
-      blendRow(s, 0, i, i === 0 ? 0 : i, 1, v);
-      const w1 = 0.33;
-      const w2 = 0.67;
-      if (last - 1 >= 0) c.heights[last - 1]![i] = c.heights[last - 1]![i]! * (1 - w1) + v * w1;
-      if (1 < n) s.heights[1]![i] = s.heights[1]![i]! * (1 - w1) + v * w1;
-      if (last - 2 >= 0) c.heights[last - 2]![i] = c.heights[last - 2]![i]! * (1 - w2) + v * w2;
-      if (2 < n) s.heights[2]![i] = s.heights[2]![i]! * (1 - w2) + v * w2;
-    }
-  }
-  // East-west pairs: e = c's east neighbor (x+1).
+  // East-west pairs first, then north-south, then corners: independent axis
+  // passes would otherwise break the corner posts of the other axis.
   for (const c of out) {
     const e = byKey.get(chunkKey(c.z, c.x + 1, c.y));
     if (!e) continue;
@@ -90,8 +68,8 @@ export function stitchTerrainEdges(terrain: ChunkTerrain[]): ChunkTerrain[] {
       const b = e.heights[j]![0]!;
       if (Math.abs(a - b) < 1e-6) continue;
       const v = (a + b) / 2;
-      blendCol(c, last, j, j === 0 ? 0 : j, 1, v);
-      blendCol(e, 0, j, j === 0 ? 0 : j, 1, v);
+      c.heights[j]![last] = v;
+      e.heights[j]![0] = v;
       const w1 = 0.33;
       const w2 = 0.67;
       if (last - 1 >= 0) c.heights[j]![last - 1] = c.heights[j]![last - 1]! * (1 - w1) + v * w1;
@@ -99,6 +77,53 @@ export function stitchTerrainEdges(terrain: ChunkTerrain[]): ChunkTerrain[] {
       if (last - 2 >= 0) c.heights[j]![last - 2] = c.heights[j]![last - 2]! * (1 - w2) + v * w2;
       if (2 < n) e.heights[j]![2] = e.heights[j]![2]! * (1 - w2) + v * w2;
     }
+  }
+  // North-south pairs: the shared edge of chunk c and its NORTH neighbor nb
+  // (tile y-1, higher originY) is c.row 0 vs nb.row 32 (both hold the same
+  // geographic line; local z decreases southward so row 0 is the north edge).
+  for (const c of out) {
+    const nb = byKey.get(chunkKey(c.z, c.x, c.y - 1));
+    if (!nb) continue;
+    for (let i = 0; i < n; i++) {
+      const a = c.heights[0]![i]!;
+      const b = nb.heights[last]![i]!;
+      if (Math.abs(a - b) < 1e-6) continue;
+      const v = (a + b) / 2;
+      c.heights[0]![i] = v;
+      nb.heights[last]![i] = v;
+      const w1 = 0.33;
+      const w2 = 0.67;
+      if (1 < n) c.heights[1]![i] = c.heights[1]![i]! * (1 - w1) + v * w1;
+      if (last - 1 >= 0) nb.heights[last - 1]![i] = nb.heights[last - 1]![i]! * (1 - w1) + v * w1;
+      if (2 < n) c.heights[2]![i] = c.heights[2]![i]! * (1 - w2) + v * w2;
+      if (last - 2 >= 0) nb.heights[last - 2]![i] = nb.heights[last - 2]![i]! * (1 - w2) + v * w2;
+    }
+  }
+  // Corner posts are shared by up to four chunks: average them so both axis
+  // seams stay continuous at the corners.
+  const cornerAvg = new Map<string, number>();
+  const cornerOwners = new Map<string, Array<{ c: ChunkTerrain; row: number; col: number }>>();
+  const cornerKey = (cx: number, cy: number, row: number, col: number): string =>
+    `${cx}/${cy}/${row === 0 ? "n" : "s"}/${col === 0 ? "w" : "e"}`;
+  for (const c of out) {
+    for (const [row, col] of [
+      [0, 0],
+      [0, last],
+      [last, 0],
+      [last, last],
+    ] as Array<[number, number]>) {
+      const key = cornerKey(c.x, c.y, row, col);
+      if (!cornerOwners.has(key)) cornerOwners.set(key, []);
+      cornerOwners.get(key)!.push({ c, row, col });
+    }
+  }
+  for (const [key, owners] of cornerOwners) {
+    let sum = 0;
+    for (const o of owners) sum += o.c.heights[o.row]![o.col]!;
+    cornerAvg.set(key, sum / owners.length);
+  }
+  for (const [key, avg] of cornerAvg) {
+    for (const o of cornerOwners.get(key)!) o.c.heights[o.row]![o.col] = avg;
   }
   return out;
 }

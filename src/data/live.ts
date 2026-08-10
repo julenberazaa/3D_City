@@ -29,9 +29,13 @@ export interface LiveLoadHandle {
 
 async function getMvtTile(theme: string, z: number, x: number, y: number): Promise<Uint8Array | undefined> {
   const url = `${OVERTURE_BASE}/${theme}.pmtiles`;
-  const source = new PMTiles(url);
-  const res = await source.getZxy(z, x, y);
-  return res ? new Uint8Array(res.data) : undefined;
+  try {
+    const source = new PMTiles(url);
+    const res = await source.getZxy(z, x, y);
+    return res ? new Uint8Array(res.data) : undefined;
+  } catch (err) {
+    throw new Error(`network: pmtiles fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /** Decode a PNG byte buffer to RGBA in the browser (OffscreenCanvas path). */
@@ -49,7 +53,12 @@ export async function decodePngBrowser(bytes: Uint8Array): Promise<{ width: numb
 
 async function fetchTerrain(z: number, x: number, y: number): Promise<DecodedHeights | undefined> {
   const url = TERRARIUM_PATTERN.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
-  const res = await fetch(url);
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    throw new Error(`network: terrain fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`);
+  }
   if (!res.ok) return undefined;
   const png = await decodePngBrowser(new Uint8Array(await res.arrayBuffer()));
   const heights = decodeTerrariumPng(png.width, png.height, png.data);

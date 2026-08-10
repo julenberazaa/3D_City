@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ChunkManager, chunkCenter, DEFAULT_STREAM_CONFIG, type ChunkState, type PlayerState } from "./chunkManager";
+import { tileSizeMeters } from "../geo/projection";
 import type { WorldFixture } from "../world/generator";
 import { buildChunkGroup, type WorldProvenance } from "../world/generator";
 import { createPhysicsChunk, removePhysicsChunk, type PhysicsChunkHandle, type PhysicsWorld } from "../physics/world";
@@ -99,7 +100,7 @@ export function createStreamer(scene: THREE.Scene, physics: PhysicsWorld, fixtur
       // Distance is measured to the chunk BOUNDS (not its center) so the chunk
       // containing the player always qualifies.
       const physicsR = manager.config.physicsRadius;
-      const half = 1222.99 / 2;
+      const half = tileSizeMeters(15) / 2;
       for (const key of manager.activeKeys()) {
         const c = chunkCenter(manager.config.origin, key);
         const dx = Math.max(0, Math.abs(c.x - player.x) - half);

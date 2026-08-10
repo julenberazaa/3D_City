@@ -204,7 +204,7 @@ export function terrainColliderFor(world: RapierWorld, c: ChunkTerrain, body?: R
     world.createRigidBody(
       RigidBodyDesc.fixed().setTranslation(c.originX + halfSpan, 0, c.originY - halfSpan),
     );
-  if (!body) b.setTranslation({ x: c.originX + halfSpan, y: 0, z: c.originY - halfSpan }, true);
+  b.setTranslation({ x: c.originX + halfSpan, y: 0, z: c.originY - halfSpan }, true);
   return world.createCollider(desc, b);
 }
 
@@ -236,7 +236,7 @@ function buildingBoxFor(
   }
   const hy = height / 2;
   const b = body ?? world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, baseY + hy, cz));
-  if (!body) b.setTranslation({ x: cx, y: baseY + hy, z: cz }, true);
+  b.setTranslation({ x: cx, y: baseY + hy, z: cz }, true);
   const desc = descFactory.cuboid(hx, hy, hz);
   desc.setFriction(1.0);
   desc.setRestitution(0.0);

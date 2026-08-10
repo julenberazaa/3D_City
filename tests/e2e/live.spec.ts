@@ -18,7 +18,7 @@ test("live: renders a real non-fixture location from open sources", async ({ pag
     );
   } catch {
     const status = await page.locator("#status").textContent().catch(() => "unknown");
-    if (status && status.includes("Error")) {
+    if (status && status.includes("Network unavailable")) {
       test.skip(true, `live sources unreachable in this environment: ${status}`);
     }
     throw new Error(`live boot failed; status=${status}`);

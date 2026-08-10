@@ -8,7 +8,7 @@ import { createStreamingPhysicsWorld, findSpawnPoint } from "./physics/world";
 import { createCar } from "./physics/vehicle";
 import { createCarVisual } from "./render/car";
 import { createControls } from "./input/controls";
-import { prepareFixture } from "./geo/fusion";
+import { prepareFixture, sampleTerrain } from "./geo/fusion";
 import { loadLiveFixture } from "./data/live";
 import { createStreamer } from "./stream/streamer";
 
@@ -29,6 +29,7 @@ interface GameDebugHandle {
   colliders: () => { terrain: number; buildings: number };
   wheels: () => number;
   headingRad: () => number;
+  groundHeight: () => number;
   stream: () => { active: number; queued: number; fetching: number; generating: number; cancelled: number; physicsChunks: number };
 }
 
@@ -161,6 +162,7 @@ async function boot(): Promise<void> {
       },
       wheels: () => latestWheels,
       headingRad: () => vehicle.headingRad(),
+      groundHeight: () => sampleTerrain(fixture.terrain, latestCarPos.x, latestCarPos.z),
       stream: () => {
         const s = streamer.counters();
         const p = streamer.physicsStats();
@@ -205,7 +207,12 @@ async function boot(): Promise<void> {
       }
     });
   } catch (err) {
-    setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`, true);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith("network:")) {
+      setStatus("Network unavailable - live sources unreachable. Check connection or use the demo world.", true);
+    } else {
+      setStatus(`Error: ${msg}`, true);
+    }
   }
 }
 
