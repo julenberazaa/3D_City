@@ -161,7 +161,7 @@ const FACADE_PALETTE: number[][] = [
 const chunkKey = (z: number, x: number, y: number): ChunkKey => `${z}-${x}-${y}`;
 
 /** Bilinear terrain height at fixture-local (x, y); grid rows run north (originY) to south. */
-function sampleTerrain(terrain: ChunkTerrain[], x: number, y: number): number {
+export function sampleTerrain(terrain: ChunkTerrain[], x: number, y: number): number {
   const cell = (c: ChunkTerrain): number => {
     const u = (x - c.originX) / c.stepMeters;
     const v = (c.originY - y) / c.stepMeters;
@@ -392,7 +392,12 @@ interface BuildingParts {
   provenance: "observed" | "derived" | "inferred";
 }
 
-function resolveBuilding(f: FixtureFeature, parts: Map<string, FixtureFeature[]>): BuildingParts | null {
+export interface ResolvedBuilding extends BuildingParts {
+  id: string;
+}
+
+/** Effective footprint+height for a building parent (parts override parents). Shared with physics. */
+export function resolveBuilding(f: FixtureFeature, parts: Map<string, FixtureFeature[]>): ResolvedBuilding | null {
   const pts = distinctPoints(f.ring ?? []);
   if (pts.length < 3 || ringArea(pts) < 4) return null;
   const parentParts = parts.get(f.id);
@@ -420,7 +425,7 @@ function resolveBuilding(f: FixtureFeature, parts: Map<string, FixtureFeature[]>
     height = 8 + (fnv1a(f.id) % 7);
     provenance = "inferred";
   }
-  return { ring, height: Math.max(3, height), roof, provenance };
+  return { id: f.id, ring, height: Math.max(3, height), roof, provenance };
 }
 
 function buildBuildingChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh: THREE.Mesh | null; count: number; provenance: WorldProvenance } {

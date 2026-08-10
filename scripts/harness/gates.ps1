@@ -92,8 +92,8 @@ function Test-Gate10BrowserSmoke {
 }
 
 function Test-Gate11GameplayE2E {
-  if (-not (Test-Path "tests/e2e/gameplay")) { return @{ Status = "N/A_WITH_JUSTIFICATION"; Detail = "no gameplay e2e yet (requires WP-03+)" } }
-  $out = npx playwright test --project=chromium gameplay 2>&1
+  if (-not (Test-Path "tests/e2e/drive.spec.ts")) { return @{ Status = "N/A_WITH_JUSTIFICATION"; Detail = "no gameplay e2e yet (requires WP-03+)" } }
+  $out = npx playwright test --project=chromium drive 2>&1
   if ($LASTEXITCODE -ne 0) { return @{ Status = "FAIL"; Detail = $out | Select-Object -Last 8 } }
   return @{ Status = "PASS"; Detail = "gameplay e2e green" }
 }
