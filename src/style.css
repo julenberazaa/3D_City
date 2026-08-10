@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #101418;
+  color: #e8eef2;
+}
+
+#app {
+  height: 100%;
+}
+
+.boot {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.boot h1 {
+  margin: 0;
+  letter-spacing: 0.08em;
+}
+
+.boot-status {
+  color: #8fa3b5;
+  font-size: 0.85rem;
+}

@@ -1,0 +1,38 @@
+{
+  "name": "3d-city",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-based 3D game reconstructing real towns from open geographic data into a stylized low-poly world",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:stress": "vite build --mode stress",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "harness": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/harness/run.ps1 -Gates all",
+    "harness:target": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/harness/run.ps1"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "pbf": "^5.1.2",
+    "pmtiles": "^4.4.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
+    "@types/three": "^0.185.4",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}
