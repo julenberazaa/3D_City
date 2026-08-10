@@ -4,6 +4,7 @@ import { decodeTerrariumPng } from "../geo/terrarium.ts";
 import {
   buildFixture,
   OVERTURE_BASE,
+  RELEASE,
   TERRARIUM_PATTERN,
   Z15,
   Z14,
@@ -15,6 +16,8 @@ import {
 } from "./fixtureBuilder.ts";
 import type { WorldFixture } from "../world/generator";
 import { prepareFixture } from "../geo/fusion.ts";
+import { ChunkCache, type CacheBackend } from "../cache/store";
+import { createIndexedDbCacheBackend } from "../cache/indexedDb";
 
 export interface LiveProgress {
   stage: "tiles" | "terrain" | "building";
@@ -27,14 +30,45 @@ export interface LiveLoadHandle {
   progress: (cb: (p: LiveProgress) => void) => void;
 }
 
+export const CACHE_BUDGET_BYTES = 200 * 1024 * 1024;
+
+let cache: ChunkCache | null = null;
+
+function getCache(): ChunkCache | null {
+  if (typeof indexedDB === "undefined") return null;
+  if (!cache) {
+    const backend: CacheBackend = createIndexedDbCacheBackend();
+    cache = new ChunkCache(backend, CACHE_BUDGET_BYTES);
+  }
+  return cache;
+}
+
+const cacheKey = (kind: string, z: number, x: number, y: number): string =>
+  `${RELEASE}|${kind}|${z}/${x}/${y}`;
+
+export function cacheStats(): { hits: number; misses: number; evicted: number; sizeBytes: number } | null {
+  return cache?.statsSnapshot() ?? null;
+}
+
 async function getMvtTile(theme: string, z: number, x: number, y: number): Promise<Uint8Array | undefined> {
   const url = `${OVERTURE_BASE}/${theme}.pmtiles`;
+  const key = cacheKey(`mvt:${theme}`, z, x, y);
+  const c = getCache();
+  if (c) {
+    const hit = await c.get(key);
+    if (hit) return new Uint8Array(hit);
+  }
   try {
     const source = new PMTiles(url);
     const res = await source.getZxy(z, x, y);
-    return res ? new Uint8Array(res.data) : undefined;
+    if (!res) return undefined;
+    const bytes = new Uint8Array(res.data);
+    if (c) await c.put(key, bytes.buffer as ArrayBuffer);
+    return bytes;
   } catch (err) {
-    throw new Error(`network: pmtiles fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`network: pmtiles fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`, {
+      cause: err,
+    });
   }
 }
 
@@ -53,14 +87,28 @@ export async function decodePngBrowser(bytes: Uint8Array): Promise<{ width: numb
 
 async function fetchTerrain(z: number, x: number, y: number): Promise<DecodedHeights | undefined> {
   const url = TERRARIUM_PATTERN.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
+  const key = cacheKey("terr", z, x, y);
+  const c = getCache();
+  if (c) {
+    const hit = await c.get(key);
+    if (hit) {
+      const png = await decodePngBrowser(new Uint8Array(hit));
+      const heights = decodeTerrariumPng(png.width, png.height, png.data);
+      return { w: png.width, h: png.height, heights };
+    }
+  }
   let res: Response;
   try {
     res = await fetch(url);
   } catch (err) {
-    throw new Error(`network: terrain fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`network: terrain fetch failed (${url}): ${err instanceof Error ? err.message : String(err)}`, {
+      cause: err,
+    });
   }
   if (!res.ok) return undefined;
-  const png = await decodePngBrowser(new Uint8Array(await res.arrayBuffer()));
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (c) await c.put(key, bytes.buffer as ArrayBuffer);
+  const png = await decodePngBrowser(bytes);
   const heights = decodeTerrariumPng(png.width, png.height, png.data);
   return { w: png.width, h: png.height, heights };
 }

@@ -61,4 +61,17 @@ test("live: renders a real non-fixture location from open sources", async ({ pag
   expect(colored).toBe(true);
 
   await page.screenshot({ path: "reports/visual/wp05-live.png" });
+
+  // Second visit must hit the persistent cache (R-015).
+  await page.reload();
+  await page.waitForFunction(
+    () => document.querySelector("#status")?.textContent?.includes("Ready"),
+    { timeout: 180000 },
+  );
+  const cacheState = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { cache: () => { hits: number; misses: number } | null } }).__game;
+    return g.cache();
+  });
+  expect(cacheState).not.toBeNull();
+  expect(cacheState!.hits).toBeGreaterThan(0);
 });

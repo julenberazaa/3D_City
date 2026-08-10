@@ -9,8 +9,12 @@ import { createCar } from "./physics/vehicle";
 import { createCarVisual } from "./render/car";
 import { createControls } from "./input/controls";
 import { prepareFixture, sampleTerrain } from "./geo/fusion";
-import { loadLiveFixture } from "./data/live";
+import { loadLiveFixture, cacheStats } from "./data/live";
 import { createStreamer } from "./stream/streamer";
+import { buildGazetteerIndex, searchGazetteer, type GazetteerEntry } from "./search/gazetteer";
+import { searchOpenMeteo } from "./search/openMeteo";
+
+export const DEMO_BBOX = "-122.425,37.767,-122.396,37.792";
 
 const FIXTURE = "sf-downtown";
 const BASE = `/fixtures/${FIXTURE}`;
@@ -30,6 +34,7 @@ interface GameDebugHandle {
   wheels: () => number;
   headingRad: () => number;
   groundHeight: () => number;
+  cache: () => { hits: number; misses: number; evicted: number } | null;
   stream: () => { active: number; queued: number; fetching: number; generating: number; cancelled: number; physicsChunks: number };
 }
 
@@ -69,11 +74,98 @@ async function loadFixture(): Promise<WorldFixture> {
   return { manifest, terrain: terrain.chunks, buildings, roads, water, landcover };
 }
 
+async function showSearch(): Promise<void> {
+  setStatus("");
+  const container = document.createElement("div");
+  container.className = "search-shell";
+  container.innerHTML = `
+    <h1>3D City</h1>
+    <p class="search-sub">Search any settlement and explore it as a stylized miniature world.</p>
+    <input id="place-input" type="search" placeholder="City, town or village…" autocomplete="off" aria-label="Search a place" />
+    <ul id="place-results" class="place-results" role="listbox" aria-label="Search results"></ul>
+    <button id="demo-btn" class="demo-btn">Explore the demo (San Francisco)</button>
+  `;
+  root.appendChild(container);
+
+  const input = container.querySelector<HTMLInputElement>("#place-input")!;
+  const resultsEl = container.querySelector<HTMLUListElement>("#place-results")!;
+  container.querySelector<HTMLButtonElement>("#demo-btn")!.addEventListener("click", () => {
+    window.location.search = `?bbox=${DEMO_BBOX}`;
+  });
+  input.focus();
+
+  let index: ReturnType<typeof buildGazetteerIndex> | null = null;
+  let pendingQuery = "";
+
+  const render = (items: { name: string; country: string; admin1: string; population: number; lat: number; lon: number }[]): void => {
+    resultsEl.innerHTML = "";
+    for (const item of items) {
+      const li = document.createElement("li");
+      const label = `${item.name}${item.country ? `, ${item.country}` : ""}${item.admin1 && item.admin1 !== item.country ? ` (${item.admin1})` : ""}`;
+      li.textContent = label;
+      li.setAttribute("role", "option");
+      li.addEventListener("click", () => {
+        const d = 0.022;
+        window.location.search = `?bbox=${(item.lon - d).toFixed(4)},${(item.lat - d).toFixed(4)},${(item.lon + d).toFixed(4)},${(item.lat + d).toFixed(4)}`;
+      });
+      resultsEl.appendChild(li);
+    }
+  };
+
+  async function runSearch(q: string): Promise<void> {
+    if (q.length < 2) {
+      resultsEl.innerHTML = "";
+      return;
+    }
+    if (!index) {
+      pendingQuery = q;
+      return;
+    }
+    let items = searchGazetteer(index, q, 6);
+    if (items.length === 0) {
+      items = await searchOpenMeteo(q, 6);
+    }
+    render(items);
+  }
+
+  void (async () => {
+    try {
+      const res = await fetch("/fixtures/gazetteer.json");
+      if (res.ok) {
+        const raw = (await res.json()) as { entries: GazetteerEntry[] };
+        index = buildGazetteerIndex(raw.entries);
+        if (pendingQuery) void runSearch(pendingQuery);
+      }
+    } catch {
+      index = null;
+    }
+  })();
+
+  let debounce = 0;
+  input.addEventListener("input", () => {
+    clearTimeout(debounce);
+    const q = input.value.trim();
+    debounce = window.setTimeout(() => {
+      void runSearch(q);
+    }, 180);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const first = resultsEl.querySelector("li");
+      first?.dispatchEvent(new MouseEvent("click"));
+    }
+  });
+}
+
 async function boot(): Promise<void> {
   try {
     await rapierInit();
     const params = new URLSearchParams(window.location.search);
     const bboxParam = params.get("bbox");
+    if (!bboxParam) {
+      void showSearch();
+      return;
+    }
     let fixture: WorldFixture;
     let sourceLabel = "fixture";
     if (bboxParam) {
@@ -163,6 +255,10 @@ async function boot(): Promise<void> {
       wheels: () => latestWheels,
       headingRad: () => vehicle.headingRad(),
       groundHeight: () => sampleTerrain(fixture.terrain, latestCarPos.x, latestCarPos.z),
+      cache: () => {
+        const s = cacheStats();
+        return s ? { hits: s.hits, misses: s.misses, evicted: s.evicted } : null;
+      },
       stream: () => {
         const s = streamer.counters();
         const p = streamer.physicsStats();
