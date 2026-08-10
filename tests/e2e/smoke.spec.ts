@@ -59,12 +59,13 @@ test("static vertical slice: fixture world boots and renders", async ({ page }) 
   expect(box!.width).toBeGreaterThanOrEqual(400);
   expect(box!.height).toBeGreaterThanOrEqual(400);
 
-  // Bottom-left pixel and a pixel near screen center must show rendered geometry,
+  // With streaming the world appears around the player; poll the screen center
+  // (the car / near terrain) and a lower-third point for rendered geometry,
   // not the clear/fog color — catches the terrain-facing-down class of bug.
-  const bottomLeft = await waitForRendered(canvas, 0, 0, "bottom-left");
-  expect(isFog(bottomLeft)).toBe(false);
-  const center = await waitForRendered(canvas, 0.5, 0.5, "center");
+  const center = await waitForRendered(canvas, 0.5, 0.45, "center");
   expect(isFog(center)).toBe(false);
+  const lower = await waitForRendered(canvas, 0.5, 0.2, "lower");
+  expect(isFog(lower)).toBe(false);
 
   mkdirSync(visualDir, { recursive: true });
   await page.screenshot({ path: `${visualDir}/wp02-slice.png` });

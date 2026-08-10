@@ -130,7 +130,20 @@ export function findSpawnPoint(
     const fx = Math.sin(cand.heading);
     const fz = Math.cos(cand.heading);
     if (!clear(cand.x + fx * 12, cand.z + fz * 12)) return null;
-    return { x: cand.x, y: sampleTerrain(terrain, cand.x, cand.z) + 0.6, z: cand.z, heading: cand.heading };
+    // Slope checks: avoid spawns on steep hills where the car rolls away or
+    // stalls climbing (SF-grade streets). Point must be locally flat, and the
+    // 12 m ahead must not climb more than ~6%.
+    const base = sampleTerrain(terrain, cand.x, cand.z);
+    const lat = Math.hypot(
+      sampleTerrain(terrain, cand.x + fz * 3, cand.z - fx * 3) - base,
+      sampleTerrain(terrain, cand.x - fz * 3, cand.z + fx * 3) - base,
+    );
+    if (lat > 1.2) return null;
+    const back = sampleTerrain(terrain, cand.x - fx * 8, cand.z - fz * 8);
+    if (Math.abs(back - base) > 1.2) return null;
+    const ahead = sampleTerrain(terrain, cand.x + fx * 12, cand.z + fz * 12);
+    if (ahead - base > 0.72) return null;
+    return { x: cand.x, y: base + 0.6, z: cand.z, heading: cand.heading };
   };
 
   for (const cand of candidates.slice(0, 2000)) {
@@ -173,7 +186,7 @@ export interface PhysicsWorld {
  *   (rows reversed), and the body must sit at the mesh grid CENTER
  *   (originX + halfSpan, 0, originY - halfSpan).
  */
-export function terrainColliderFor(world: RapierWorld, c: ChunkTerrain): Collider {
+export function terrainColliderFor(world: RapierWorld, c: ChunkTerrain, body?: RapierBody): Collider {
   const n = c.size;
   const cells = n - 1;
   const step = c.stepMeters;
@@ -186,10 +199,13 @@ export function terrainColliderFor(world: RapierWorld, c: ChunkTerrain): Collide
   const desc = descFactory.heightfield(cells, cells, data, { x: cells * step, y: 1, z: cells * step }, 0);
   desc.setFriction(1.0);
   const halfSpan = (cells * step) / 2;
-  const body = world.createRigidBody(
-    RigidBodyDesc.fixed().setTranslation(c.originX + halfSpan, 0, c.originY - halfSpan),
-  );
-  return world.createCollider(desc, body);
+  const b =
+    body ??
+    world.createRigidBody(
+      RigidBodyDesc.fixed().setTranslation(c.originX + halfSpan, 0, c.originY - halfSpan),
+    );
+  if (!body) b.setTranslation({ x: c.originX + halfSpan, y: 0, z: c.originY - halfSpan }, true);
+  return world.createCollider(desc, b);
 }
 
 function buildingBoxFor(
@@ -197,6 +213,7 @@ function buildingBoxFor(
   terrain: ChunkTerrain[],
   ring: number[][],
   height: number,
+  body?: RapierBody,
 ): Collider | null {
   let minX = Infinity;
   let maxX = -Infinity;
@@ -218,11 +235,76 @@ function buildingBoxFor(
     baseY = Math.max(baseY, sampleTerrain(terrain, p[0], p[1]));
   }
   const hy = height / 2;
-  const body = world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, baseY + hy, cz));
+  const b = body ?? world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, baseY + hy, cz));
+  if (!body) b.setTranslation({ x: cx, y: baseY + hy, z: cz }, true);
   const desc = descFactory.cuboid(hx, hy, hz);
   desc.setFriction(1.0);
   desc.setRestitution(0.0);
-  return world.createCollider(desc, body);
+  return world.createCollider(desc, b);
+}
+
+export interface PhysicsChunkHandle {
+  key: string;
+  bodies: RapierBody[];
+  buildings: number;
+}
+
+type RapierBody = ReturnType<RapierWorld["createRigidBody"]>;
+
+/**
+ * Add one chunk's physics (terrain heightfield + building boxes) to the world.
+ * Returns a handle for later removal.
+ */
+export function createPhysicsChunk(pw: PhysicsWorld, key: string): PhysicsChunkHandle | null {
+  const [tx, ty] = key.split("/").map(Number);
+  const terrain = pw.fixture.terrain.find((c) => c.x === tx && c.y === ty);
+  if (!terrain) return null;
+  const bodies: RapierBody[] = [];
+  const terrainBody = pw.world.createRigidBody(RigidBodyDesc.fixed());
+  bodies.push(terrainBody);
+  terrainColliderFor(pw.world, terrain, terrainBody);
+  let buildings = 0;
+  const chunkBuildings = pw.fixture.buildings.find((c) => c.x === tx && c.y === ty);
+  if (chunkBuildings) {
+    const parts = new Map<string, FixtureFeature[]>();
+    const parents: FixtureFeature[] = [];
+    for (const f of chunkBuildings.features) {
+      if (f.partOf) {
+        const list = parts.get(f.partOf) ?? [];
+        list.push(f);
+        parts.set(f.partOf, list);
+      } else {
+        parents.push(f);
+      }
+    }
+    for (const f of parents) {
+      const built = resolveBuilding(f, parts);
+      if (!built) continue;
+      const body = pw.world.createRigidBody(RigidBodyDesc.fixed());
+      const collider = buildingBoxFor(pw.world, pw.fixture.terrain, built.ring, built.height, body);
+      if (collider) {
+        bodies.push(body);
+        buildings++;
+      }
+    }
+  }
+  return { key, bodies, buildings };
+}
+
+/** Remove one chunk's physics (each rigid body removal drops its colliders). */
+export function removePhysicsChunk(pw: PhysicsWorld, handle: PhysicsChunkHandle): void {
+  for (const body of handle.bodies) pw.world.removeRigidBody(body);
+}
+
+/** Empty physics world for streaming: colliders are added per chunk. */
+export function createStreamingPhysicsWorld(fixture: WorldFixture): PhysicsWorld {
+  return {
+    world: new World({ x: 0, y: -9.81, z: 0 }),
+    terrainColliders: [],
+    buildingColliders: [],
+    fixture,
+    stats: { terrainChunks: 0, buildings: 0, skipped: 0 },
+  };
 }
 
 /**

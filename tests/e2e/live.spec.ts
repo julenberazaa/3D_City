@@ -24,12 +24,19 @@ test("live: renders a real non-fixture location from open sources", async ({ pag
     throw new Error(`live boot failed; status=${status}`);
   }
 
-  const state = await page.evaluate(() => {
-    const g = (window as unknown as { __game: { colliders: () => { terrain: number; buildings: number }; carPos: () => { x: number; y: number; z: number } } }).__game;
-    return { colliders: g.colliders(), pos: g.carPos() };
-  });
-  expect(state.colliders.terrain).toBeGreaterThanOrEqual(1);
-  expect(state.colliders.buildings).toBeGreaterThan(50);
+  // Physics chunks activate as the streamer wakes up; poll until present.
+  let state = { terrain: 0, buildings: 0, pos: { x: 0, y: 0, z: 0 } };
+  const cDeadline = Date.now() + 60000;
+  while (Date.now() < cDeadline) {
+    state = await page.evaluate(() => {
+      const g = (window as unknown as { __game: { colliders: () => { terrain: number; buildings: number }; carPos: () => { x: number; y: number; z: number } } }).__game;
+      return { ...g.colliders(), pos: g.carPos() };
+    });
+    if (state.terrain >= 1 && state.buildings > 50) break;
+    await page.waitForTimeout(500);
+  }
+  expect(state.terrain).toBeGreaterThanOrEqual(1);
+  expect(state.buildings).toBeGreaterThan(50);
   for (const v of [state.pos.x, state.pos.y, state.pos.z]) {
     expect(Number.isFinite(v)).toBe(true);
   }

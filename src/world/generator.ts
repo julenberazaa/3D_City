@@ -501,6 +501,51 @@ const WATER_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertex
 const LANDCOVER_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertexColors: true });
 const BUILDING_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertexColors: true });
 
+export interface ChunkBuildResult {
+  group: THREE.Group;
+  counts: { buildings: number; roads: number; waterPolys: number; landcover: number };
+  provenance: WorldProvenance;
+}
+
+/** Build the render group for ONE z15 chunk (terrain+roads+water+landcover+buildings). */
+export function buildChunkGroup(fixture: WorldFixture, z: number, x: number, y: number): ChunkBuildResult {
+  void z;
+  const group = new THREE.Group();
+  const counts = { buildings: 0, roads: 0, waterPolys: 0, landcover: 0 };
+  const provenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
+
+  const terrain = fixture.terrain.find((c) => c.x === x && c.y === y);
+  if (terrain) {
+    const mesh = buildTerrainChunkMesh(terrain);
+    if (mesh) group.add(mesh);
+  }
+  const addChunk = <T extends { z: number; x: number; y: number }>(
+    records: T[],
+    build: (c: T) => { mesh: THREE.Mesh | null; count: number },
+    countKey: keyof typeof counts,
+  ): void => {
+    const rec = records.find((c) => c.x === x && c.y === y);
+    if (!rec) return;
+    const { mesh, count } = build(rec);
+    counts[countKey] += count;
+    if (mesh) group.add(mesh);
+  };
+  addChunk(fixture.roads, (c) => buildRoadChunkMesh(c, fixture.terrain), "roads");
+  addChunk(fixture.water, (c) => buildWaterChunkMesh(c), "waterPolys");
+  addChunk(fixture.landcover, (c) => buildLandcoverChunkMesh(c, fixture.terrain), "landcover");
+
+  const bRec = fixture.buildings.find((c) => c.x === x && c.y === y);
+  if (bRec) {
+    const { mesh, count, provenance: p } = buildBuildingChunkMesh(bRec, fixture.terrain);
+    counts.buildings += count;
+    provenance.observed += p.observed;
+    provenance.derived += p.derived;
+    provenance.inferred += p.inferred;
+    if (mesh) group.add(mesh);
+  }
+  return { group, counts, provenance };
+}
+
 /**
  * Build the full stylized low-poly world from a pinned fixture.
  * Deterministic: same fixture JSON always produces identical geometry.

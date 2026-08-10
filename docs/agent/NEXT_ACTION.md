@@ -1,9 +1,9 @@
 # NEXT ACTION — never lose the thread
 
-CURRENT MILESTONE: WP-06 world chunk streamer
-CURRENT WORK PACKAGE: WP-06
+CURRENT MILESTONE: WP-07 persistent cache + WP-08 place search
+CURRENT WORK PACKAGE: WP-07 (then WP-08)
 CURRENT BLOCKER: none
-NEXT SINGLE ACTION: Implement the chunk streamer: split the world into per-chunk generation units (terrain/roads/buildings/physics per z15 chunk), a chunk lifecycle manager with priority (distance+heading+velocity), cancellation, bounded queues, and a streamed play area that grows/shrinks around the player — replacing the load-all-fixture boot.
-WHY IT IS NEXT: P0 requires streaming (R-014); the live pipeline (WP-05) already fetches per-chunk sources, so WP-06 builds the lifecycle on top of it.
-ACCEPTANCE CONDITION: unit tests for lifecycle/priority/cancellation; e2e drives across ≥2 chunk boundaries in a live or fixture streamed world; bounded queue assertions.
-EVIDENCE TO PRODUCE: streaming unit tests green; streamed e2e screenshot; queue/cancellation counters.
+NEXT SINGLE ACTION: Implement the persistent cache: IndexedDB store for live-fixture chunk data keyed by the versioned chunk key (R-009/R-015), size accounting + eviction + corruption handling; then the place search (bundled GeoNames gazetteer + Open-Meteo fallback) + safe spawn integration.
+WHY IT IS NEXT: streaming works; caching makes revisits fast (P0: returning to an area is deterministic AND fast); search is the last P0 user-facing piece.
+ACCEPTANCE CONDITION: cache unit tests (hit/miss/eviction/corruption) green; search unit tests green (gazetteer resolve + fallback policy); live e2e uses cache on second visit.
+EVIDENCE TO PRODUCE: tests/unit/cache.test.ts + tests/unit/search.test.ts green; second-visit cache-hit evidence.

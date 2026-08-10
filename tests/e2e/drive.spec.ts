@@ -13,12 +13,25 @@ test("game boots and the car drives through the world", async ({ page }) => {
   await expect(hud).toContainText("buildings");
   await expect(hud).toContainText("roads");
 
-  const state = await page.evaluate(() => {
-    const g = (window as unknown as { __game: { colliders: () => { terrain: number; buildings: number } } }).__game;
-    return g.colliders();
+  // Physics chunks activate as the streamer wakes up; poll until present.
+  let state = { terrain: 0, buildings: 0 };
+  const cDeadline = Date.now() + 60000;
+  while (Date.now() < cDeadline) {
+    state = await page.evaluate(() => {
+      const g = (window as unknown as { __game: { colliders: () => { terrain: number; buildings: number } } }).__game;
+      return g.colliders();
+    });
+    if (state.terrain >= 1 && state.buildings > 50) break;
+    await page.waitForTimeout(500);
+  }
+  expect(state.terrain).toBeGreaterThanOrEqual(1);
+  expect(state.buildings).toBeGreaterThan(50);
+
+  const streamState = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { stream: () => { active: number } } }).__game;
+    return g.stream();
   });
-  expect(state.terrain).toBe(16);
-  expect(state.buildings).toBeGreaterThan(3000);
+  expect(streamState.active).toBeGreaterThanOrEqual(1);
 
   const start = await page.evaluate(() => {
     const g = (window as unknown as { __game: { carPos: () => { x: number; y: number; z: number } } }).__game;
@@ -27,19 +40,34 @@ test("game boots and the car drives through the world", async ({ page }) => {
 
   await page.keyboard.down("KeyW");
 
-  let last: { pos: { x: number; y: number; z: number }; speed: number; wheels: number } | null = null;
+  let last: { pos: { x: number; y: number; z: number }; speed: number; wheels: number; heading: number } | null = null;
   const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
     await page.waitForTimeout(2000);
     last = await page.evaluate(() => {
       const g = (window as unknown as {
-        __game: { carPos: () => { x: number; y: number; z: number }; speedKmh: () => number; wheels: () => number };
+        __game: { carPos: () => { x: number; y: number; z: number }; speedKmh: () => number; wheels: () => number; headingRad: () => number };
       }).__game;
-      return { pos: g.carPos(), speed: g.speedKmh(), wheels: g.wheels() };
+      return { pos: g.carPos(), speed: g.speedKmh(), wheels: g.wheels(), heading: g.headingRad() };
     });
     const moved = Math.hypot(last.pos.x - start.x, last.pos.z - start.z);
     if (moved > 5 && last.speed > 1) break;
   }
+
+  // Causality gate over a SHORT window (roads curve; long displacement vs
+  // final heading misaligns on turns): sample p1, keep driving 2 s, sample
+  // p2+heading, and require the short displacement to align with the heading.
+  const p1 = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { carPos: () => { x: number; y: number; z: number } } }).__game;
+    return g.carPos();
+  });
+  await page.waitForTimeout(2000);
+  const p2 = await page.evaluate(() => {
+    const g = (window as unknown as {
+      __game: { carPos: () => { x: number; y: number; z: number }; headingRad: () => number };
+    }).__game;
+    return { pos: g.carPos(), heading: g.headingRad() };
+  });
   await page.keyboard.up("KeyW");
 
   expect(last).not.toBeNull();
@@ -47,15 +75,11 @@ test("game boots and the car drives through the world", async ({ page }) => {
   expect(moved).toBeGreaterThan(5);
   expect(last!.wheels).toBeGreaterThanOrEqual(2);
   expect(last!.speed).toBeGreaterThan(0);
-  // Causality gate: displacement must align with the spawn heading (proves
-  // the throttle drove the car forward instead of rolling/drifting).
-  const spawnHeading = await page.evaluate(() => {
-    const g = (window as unknown as { __game: { headingRad: () => number } }).__game;
-    return g.headingRad();
-  });
+  const windowMoved = Math.hypot(p2.pos.x - p1.x, p2.pos.z - p1.z);
+  expect(windowMoved).toBeGreaterThan(1);
   const forwardDot =
-    ((last!.pos.x - start.x) * Math.sin(spawnHeading) + (last!.pos.z - start.z) * Math.cos(spawnHeading)) /
-    moved;
+    ((p2.pos.x - p1.x) * Math.sin(p2.heading) + (p2.pos.z - p1.z) * Math.cos(p2.heading)) /
+    windowMoved;
   expect(forwardDot).toBeGreaterThan(0.5);
 
   await page.keyboard.down("KeyA");

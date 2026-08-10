@@ -12,7 +12,7 @@ States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRIT
 | WP-03 | Physics vertical slice — Rapier world (16 terrain heightfields + 14,004 building boxes), raycast vehicle (calibrated), keyboard controls, camera follow, safe spawn (building clearance), adaptive pixel ratio; drive e2e GREEN | PASS | R-011, R-016 (partial) | 37 unit tests + 2 e2e | reports/visual/wp03-drive.png, harness run 20260810-1913xx | WP-04 |
 | WP-04 | Geo fusion — GeoFusionPipeline (geo↔local, unified elevation policy, deterministic terrain edge stitching ≤1.64m→0, floating-origin rebase groundwork) wired into render+physics | PASS | R-012, R-008 (policy) | 43 unit tests + 2 e2e | tests/unit/fusion.test.ts | WP-05 |
 | WP-05 | Live data pipeline — shared fixture builder (byte-identical oracle), versioned chunk keys, browser live loader (Overture PMTiles + terrarium via ?bbox=), live e2e GREEN (San Jose area) | PASS | R-009, R-013 | 47 unit tests + 3 e2e (smoke/drive/live) | reports/visual/wp05-live.png | WP-06 |
-| WP-06 | Chunk streamer | NOT_STARTED | R-014 | streaming tests | pending | implement |
+| WP-06 | Chunk streamer — ChunkManager (priority/cancellation/bounded queues/eviction), per-chunk render+physics, origin-aware chunk keys, slope-aware safe spawn; all e2e green incl. live | PASS | R-014, R-016 | 56 unit + 4 e2e | tests/unit/chunkManager.test.ts | WP-07 |
 | WP-07 | Persistent cache | NOT_STARTED | R-015 | cache tests | pending | implement |
 | WP-08 | Place search + spawn | NOT_STARTED | R-016 | search tests | pending | implement |
 | WP-09 | World fidelity | NOT_STARTED | R-017..R-020 | fidelity tests | pending | implement |

@@ -1,15 +1,16 @@
 import "./style.css";
 import * as THREE from "three";
 import { init as rapierInit } from "@dimforge/rapier3d-compat";
-import { buildWorld, type ChunkRecord, type ChunkTerrain, type WorldFixture, type WorldModel } from "./world/generator";
-import { prepareFixture } from "./geo/fusion";
-import { loadLiveFixture } from "./data/live";
+import { type ChunkRecord, type ChunkTerrain, type WorldFixture } from "./world/generator";
 import { createOrbitCamera } from "./render/camera";
 import { createRenderer } from "./render/renderer";
-import { createPhysicsWorld, findSpawnPoint } from "./physics/world";
+import { createStreamingPhysicsWorld, findSpawnPoint } from "./physics/world";
 import { createCar } from "./physics/vehicle";
 import { createCarVisual } from "./render/car";
 import { createControls } from "./input/controls";
+import { prepareFixture } from "./geo/fusion";
+import { loadLiveFixture } from "./data/live";
+import { createStreamer } from "./stream/streamer";
 
 const FIXTURE = "sf-downtown";
 const BASE = `/fixtures/${FIXTURE}`;
@@ -28,6 +29,7 @@ interface GameDebugHandle {
   colliders: () => { terrain: number; buildings: number };
   wheels: () => number;
   headingRad: () => number;
+  stream: () => { active: number; queued: number; fetching: number; generating: number; cancelled: number; physicsChunks: number };
 }
 
 declare global {
@@ -66,14 +68,6 @@ async function loadFixture(): Promise<WorldFixture> {
   return { manifest, terrain: terrain.chunks, buildings, roads, water, landcover };
 }
 
-function attachWorld(scene: THREE.Scene, world: WorldModel): void {
-  for (const group of world.groups.terrain.values()) scene.add(group);
-  for (const group of world.groups.roads.values()) scene.add(group);
-  for (const group of world.groups.water.values()) scene.add(group);
-  for (const group of world.groups.landcover.values()) scene.add(group);
-  for (const group of world.groups.buildings.values()) scene.add(group);
-}
-
 async function boot(): Promise<void> {
   try {
     await rapierInit();
@@ -94,9 +88,8 @@ async function boot(): Promise<void> {
       fixture = prepareFixture(await loadFixture());
     }
     setStatus("Generating world");
-    const world = buildWorld(fixture);
-    setStatus("Preparing physics");
-    const physics = createPhysicsWorld(fixture);
+
+    const physics = createStreamingPhysicsWorld(fixture);
     const spawn = findSpawnPoint(fixture.roads, fixture.terrain, fixture);
     const vehicle = createCar(physics.world, spawn);
     setStatus("Ready");
@@ -109,6 +102,11 @@ async function boot(): Promise<void> {
     const car = createCarVisual();
     render.scene.add(car.group);
     const controls = createControls(root);
+    const streamer = createStreamer(render.scene, physics, fixture);
+    streamer.onChunkActivated = (key) => {
+      // first activation: snap HUD data
+      void key;
+    };
 
     let followMode = true;
     const latestCarPos = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
@@ -124,17 +122,20 @@ async function boot(): Promise<void> {
     resize();
     window.addEventListener("resize", resize);
 
-    attachWorld(render.scene, world);
-
     const fmt = (n: number) => n.toLocaleString("en-US");
     const updateHud = () => {
       const stats = render.getStats();
+      const stream = streamer.counters();
+      const active = streamer.activeCounts();
+      const prov = streamer.activeProvenance();
+      const pstat = streamer.physicsStats();
       hudEl.textContent = [
         `${fixture.manifest.name} (${sourceLabel})`,
-        `buildings: ${fmt(world.counts.buildings)}   roads: ${fmt(world.counts.roads)}   water: ${fmt(world.counts.waterPolys)}`,
-        `triangles: ${fmt(stats.triangles)}   draw calls: ${fmt(stats.drawCalls)}`,
-        `physics: terrain ${physics.stats.terrainChunks} / buildings ${physics.stats.buildings}   wheels ${latestWheels}/4   ${latestSpeedKmh.toFixed(0)} km/h`,
-        `camera: ${followMode ? "follow (c)" : "orbit (c)"}   HUD: h`,
+        `chunks: ${stream.active} active | q ${stream.queued} / f ${stream.fetching} / g ${stream.generating} | cancelled ${stream.cancelled}`,
+        `buildings: ${fmt(active.buildings)}   roads: ${fmt(active.roads)}   water: ${fmt(active.waterPolys)}`,
+        `triangles: ${fmt(stats.triangles)}   draw calls: ${fmt(stats.drawCalls)}   physics: ${pstat.chunks} chunks / ${fmt(pstat.buildings)} buildings`,
+        `provenance: obs ${fmt(prov.observed)} / der ${fmt(prov.derived)} / inf ${fmt(prov.inferred)}`,
+        `wheels ${latestWheels}/4   ${latestSpeedKmh.toFixed(0)} km/h   camera: ${followMode ? "follow (c)" : "orbit (c)"}   HUD: h`,
       ].join("\n");
     };
     hudEl.hidden = false;
@@ -154,9 +155,17 @@ async function boot(): Promise<void> {
       carPos: () => ({ x: latestCarPos.x, y: latestCarPos.y, z: latestCarPos.z }),
       speedKmh: () => latestSpeedKmh,
       status: () => status,
-      colliders: () => ({ terrain: physics.stats.terrainChunks, buildings: physics.stats.buildings }),
+      colliders: () => {
+        const p = streamer.physicsStats();
+        return { terrain: p.chunks, buildings: p.buildings };
+      },
       wheels: () => latestWheels,
       headingRad: () => vehicle.headingRad(),
+      stream: () => {
+        const s = streamer.counters();
+        const p = streamer.physicsStats();
+        return { active: s.active, queued: s.queued, fetching: s.fetching, generating: s.generating, cancelled: s.cancelled, physicsChunks: p.chunks };
+      },
     };
 
     let accumulator = 0;
@@ -165,6 +174,13 @@ async function boot(): Promise<void> {
       vehicle.setThrottle(controls.throttle);
       vehicle.setSteer(controls.steer);
       vehicle.setBrake(controls.brake);
+      const fwd = vehicle.forward();
+      streamer.update({
+        x: latestCarPos.x,
+        z: latestCarPos.z,
+        heading: vehicle.headingRad(),
+        speed: vehicle.speedKmh() / 3.6,
+      });
       while (accumulator >= FIXED_STEP) {
         vehicle.update(FIXED_STEP);
         physics.world.step();
@@ -176,7 +192,6 @@ async function boot(): Promise<void> {
       latestSpeedKmh = vehicle.speedKmh();
       latestWheels = vehicle.wheelsInContact();
       if (followMode) {
-        const fwd = vehicle.forward();
         orbit.camera.position.set(
           latestCarPos.x - fwd.x * 40,
           latestCarPos.y + 30,
