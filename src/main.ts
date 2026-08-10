@@ -2,6 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 import { init as rapierInit } from "@dimforge/rapier3d-compat";
 import { buildWorld, type ChunkRecord, type ChunkTerrain, type WorldFixture, type WorldModel } from "./world/generator";
+import { prepareFixture } from "./geo/fusion";
 import { createOrbitCamera } from "./render/camera";
 import { createRenderer } from "./render/renderer";
 import { createPhysicsWorld, findSpawnPoint } from "./physics/world";
@@ -75,7 +76,7 @@ function attachWorld(scene: THREE.Scene, world: WorldModel): void {
 async function boot(): Promise<void> {
   try {
     await rapierInit();
-    const fixture = await loadFixture();
+    const fixture = prepareFixture(await loadFixture());
     setStatus("Generating world");
     const world = buildWorld(fixture);
     setStatus("Preparing physics");
