@@ -1,7 +1,8 @@
 # CONTINUATION — recovery after interruption
 
-- **Branch**: main. **HEAD**: `git log -1` (final release commit, pushed to origin).
-- **Remote**: https://github.com/julenberazaa/3D_City.git (push OK, no force-push).
+- **Branch**: main. **HEAD**: `69fa3415b92ae6ec5ae3f4e2b744189a1269851f` (final release commit; NOT yet pushed — see EXTERNAL_BLOCKER below).
+- **Remote**: https://github.com/julenberazaa/3D_City.git.
+- **EXTERNAL_BLOCKER (deployment)**: both stored GitHub credentials (classic 40-char and fine-grained `github_pat_`) authenticate as julenberazaa but LACK Contents: write — `git push` returns 403. Pages IS enabled (build_type=workflow, API-verified). Required user action: re-auth a credential with Contents: write (or classic `repo` scope), then run `git push origin main` — CI verify (proven green) + deploy-pages will deploy to https://julenberazaa.github.io/3D_City/. Verification after push: `node scripts/perf/verify-deployed.mjs` if present, else smoke the public URL.
 - **Public deployment**: https://julenberazaa.github.io/3D_City/ (GitHub Pages,
   build_type=workflow, enabled via API 2026-08-11; deployment artifacts from CI).
 - **Model lock**: engineering = `opencode-go/deepseek-v4-flash`; visual = `opencode-go/gpt-5.6-luna` (docs/agent/MODEL_LOCK.md).
