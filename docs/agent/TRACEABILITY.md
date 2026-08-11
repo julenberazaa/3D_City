@@ -1,36 +1,34 @@
 # TRACEABILITY — requirement → code → test → evidence
 
+Updated 2026-08-11 (final release). Every state is backed by executable evidence
+(harmony with harness run + clean-clone test).
+
 | Req | Module(s) | Test(s) | Runtime evidence | State |
 |---|---|---|---|---|
-| R-004 (pre) | src/geo/terrarium.ts | terrarium.test.ts | vitest 2 green | WP-02a PARTIAL |
-| R-005 (pre) | src/geo/mvt.ts | mvt.test.ts | vitest 3 green | WP-02a PARTIAL |
-| R-010 (pre) | src/geo/projection.ts, src/world/types.ts | projection.test.ts | vitest 6 green | WP-02a PARTIAL |
-| R-001 | src/main.ts, src/render/renderer.ts, vite.config.ts | tests/e2e/smoke.spec.ts | e2e 1 passed; screenshot reports/visual/wp02-slice.png | WP-02c PASS |
-| R-002 | src/search/ | search unit tests | e2e | NOT_STARTED |
-| R-003 | src/main.ts (stage UI, fetch errors) | e2e DOM (#status stages) | e2e asserts #status "Ready" | WP-02c PARTIAL |
-| R-004 | src/world/generator.ts (terrain) | generator.test.ts (vertex count, y-range) | e2e screenshot | WP-02c PASS |
-| R-005 | src/world/generator.ts (roads) | generator.test.ts (determinism) | e2e screenshot | WP-02c PASS |
-| R-006 | src/world/generator.ts (buildings) | generator.test.ts (counts, y-range) | e2e screenshot | WP-02c PASS |
-| R-007 | docs/agent/UPSTREAM_REUSE_AUDIT.md | gate 19 | audit doc | PASS (WP-01) |
-| R-008 | src/geo/provenance.ts | provenance unit test | debug overlay | NOT_STARTED |
-| R-009 | src/world/generator.ts (FNV-1a, no random) | generator.test.ts determinism | identical geometry across 2 builds | WP-02c PASS |
-| R-010 | WP-02 slice | fixture tests + smoke e2e | screenshot reports/visual/wp02-slice.png | WP-02c PASS |
-| R-011 | src/physics/, src/vehicle/ | physics unit + e2e | e2e drive | NOT_STARTED |
-| R-012 | src/geo/fusion.ts | fusion unit tests | e2e seams check | NOT_STARTED |
-| R-013 | src/data/ | live e2e | live render screenshot | NOT_STARTED |
-| R-014 | src/stream/ | streaming unit tests | e2e traversal | NOT_STARTED |
-| R-015 | src/cache/ | cache unit tests | e2e revisit timing | NOT_STARTED |
-| R-016 | src/spawn/ | spawn unit tests | e2e spawn check | NOT_STARTED |
-| R-017 | src/world/generator.ts (height/roof) | fixture tests | screenshot | WP-02c PARTIAL |
-| R-018 | src/world/generator.ts (water, landcover) | generator sanity | screenshot | WP-02c PARTIAL |
-| R-019 | src/geo/bridgeTunnel.ts | fixture tests | screenshot | NOT_STARTED |
-| R-020 | src/character/ | e2e | walk e2e | NOT_STARTED |
-| R-021 | src/render/camera.ts | e2e | screenshots | WP-02c PARTIAL |
-| R-022 | src/perf/ | perf harness | reports/performance | NOT_STARTED |
-| R-023 | whole | Luna review cycles | reports/visual | WP-02c PARTIAL |
-| R-024 | CI + docs | final harness | run report | NOT_STARTED |
-| R-025 | src/main.ts (fetch error path) | e2e | #status error text | WP-02c PARTIAL |
-| R-026 | src/ui/ | a11y e2e | gate 17 | NOT_STARTED |
-| R-027 | global | gate 18 | audit | NOT_STARTED |
-
-Update this table every time a requirement changes state.
+| R-001 | src/main.ts, src/render/renderer.ts, vite.config.ts | tests/e2e/smoke.spec.ts | e2e 1 passed; screenshot reports/visual/final/02-fixture-world.png | PASS |
+| R-002 | src/search/gazetteer.ts, src/search/openMeteo.ts, src/main.ts (showSearch) | tests/unit/search.test.ts; tests/e2e/search.spec.ts (4 tests) | e2e live search + keyboard navigation | PASS |
+| R-003 | src/main.ts (setStatus stages + spinner) | e2e status assertions (role=status, aria-live) | screenshots 03-loading | PASS |
+| R-004 | src/geo/terrarium.ts, src/world/generator.ts (terrain) | terrarium.test.ts, fixture.test.ts | e2e smoke renders terrain | PASS |
+| R-005 | src/world/generator.ts (roads), src/geo/fusion.ts | fixture.test.ts (bridge rule) | e2e screenshots | PASS |
+| R-006 | src/world/generator.ts (buildings), src/geo/fusion.ts | fixture.test.ts (counts, rings) | e2e screenshots | PASS |
+| R-007 | docs/agent/UPSTREAM_REUSE_AUDIT.md | harness gate 20 | audit doc present | PASS |
+| R-008 | src/world/generator.ts (provenance tracking) | HUD provenance counters in smoke e2e | e2e HUD shows obs/der/inf | PASS |
+| R-009 | src/data/chunkKey.ts (versioned keys), src/world/generator.ts (deterministic) | chunkKey.test.ts, generator.test.ts (determinism) | byte-identical fixture oracle (tools) | PASS |
+| R-010 | src/world/generator.ts (buildWorld/buildChunkPieces) | fixture.test.ts, smoke e2e | reports/visual/final/02-fixture-world.png | PASS |
+| R-011 | src/physics/world.ts, src/physics/vehicle.ts | physics.test.ts (12 tests), drive.spec.ts | drive e2e: causality + ground-truth y + R-recovery gates | PASS |
+| R-012 | src/geo/fusion.ts | fusion.test.ts (stitch <0.01, idempotency) | — | PASS |
+| R-013 | src/data/live.ts (PMTiles + terrarium) | live.spec.ts (skips as BLOCKED_EXTERNAL offline) | live e2e renders real location | PASS |
+| R-014 | src/stream/chunkManager.ts, src/stream/streamer.ts | chunkManager.test.ts, streamer-race.test.ts (zombie leak + black hole) | benchmark runs (45+ chunks streamed, evictions) | PASS |
+| R-015 | src/cache/store.ts, src/cache/indexedDb.ts | cache.test.ts (LRU, corruption, self-heal, mutex, re-put) | hardware-revisit.json: 100% hits, load 90s→64s | PASS |
+| R-016 | src/physics/world.ts (findSpawnPoint + clear-run scoring) | physics.test.ts (spawn, near) | spawn probe: continuous drive, no wedge | PASS |
+| R-017 | src/world/generator.ts (heights/roofs) | fixture.test.ts (≥40% height/levels) | — | PASS |
+| R-018 | src/world/generator.ts (water/landcover) | fixture.test.ts (≥1 water/landcover) | screenshots | PASS |
+| R-019 | src/world/generator.ts (bridge rule) | fixture.test.ts (road verts over water ≥ surface) | SF motorway-over-water verified in data | PASS (minimal set; tunnels documented) |
+| R-020 | — | — | — | DEFERRED (documented in STATUS/NEXT_ACTION) |
+| R-021 | src/render/camera.ts, src/input/controls.ts, src/main.ts | drive e2e (R recovery, camera) | screenshots | PASS |
+| R-022 | src/render/renderer.ts (governor), src/bench/benchmark.ts | render-quality.test.ts; scripts/perf/hardware-benchmark.mjs | hardware-*.json: FPS p50 161-164, p95 ≤8.4 ms, stalls 1 (startup), heap bounded | PASS |
+| R-023 | whole | Luna final review (2 cycles) | reports/visual/final/*.png; ledger | PASS |
+| R-024 | .github/workflows/ci.yml, vite.config.ts (base "./") | clean-clone test (temp worktree), CI, Pages deploy | https://julenberazaa.github.io/3D_City/ | PASS |
+| R-025 | src/data/live.ts (network classification), src/cache/store.ts (corruption), src/stream/streamer.ts (failure slot release) | cache.test.ts, live.spec.ts, streamer-race.test.ts | — | PASS |
+| R-026 | src/main.ts (search a11y), src/style.css | search.spec.ts (arrows/aria/live-region/status) | — | PASS |
+| R-027 | global (parseBbox validation, no eval) | harness gate 19 (audit/secret scan) | npm audit clean | PASS |

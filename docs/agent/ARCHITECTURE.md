@@ -37,14 +37,16 @@
   PMTiles maxZoom is 14 (buildings/transportation) and 13 (base) → **overzoom**: fetch
   z14/z13 tiles and bucket features into the z15 chunk grid (verified by probe during
   WP-02b; SF fixture = 16 z15 chunks). Terrain (terrarium) is real z15, sampled 33×33.
-  Finer chunking (z16/z17) may be evaluated for streaming in WP-06. State machine:
-  UNSEEN → QUEUED → FETCHING → DECODING → FUSING → GENERATING → GPU_READY → ACTIVE →
-  CACHE_ONLY → EVICTED; all stages cancellable.
-- Priority: distance + heading/velocity projection + camera direction + LOD need +
-  queue backpressure. Physics radius 120 m, high-detail 300 m, low-detail/prefetch 900 m
-  (hypotheses to profile in WP-11).
-- Decode/fuse/generate in Web Workers (Transferable buffers). Main thread: input,
-  physics step, render, minimal UI.
+  State machine: UNSEEN → QUEUED → FETCHING → GENERATING → ACTIVE → EVICTED; all stages
+  cancellable.
+- Priority: distance + heading/velocity projection (chunkPriority). Radii (code truth):
+  physics 400 m / detail 1200 m / prefetch 2400 m, maxQueued 24, maxConcurrentFetch 4.
+- Generation is ASYNC BATCHED on the main thread: buildChunkPieces is a generator with
+  control points; the streamer steps it with a ~14 ms frame budget, yielding via rAF
+  between batches, and cancellation discards partial work (identity-guarded, see
+  streamer-race tests). Ring decimation (≤64 verts) bounds single-polygon cost.
+  Web Workers are the documented future step (OPTIMIZATION_LOG O-05); async batching
+  meets the acceptance with no serialization/race surface.
 
 ## Generation rules (stylized low-poly)
 - Buildings: real footprint polygon extruded; height = max(height, levels×3 m) from
@@ -52,8 +54,12 @@
   facade/roof color deterministic hash → style palette (INFERRED); building_parts
   overridden onto parent footprint. Floor bands derived from levels (DERIVED).
 - Roads: centerline → ribbon mesh on terrain + simplified surface; lanes from class.
+  **Bridge rule (R-019 minimal)**: road vertices inside a water polygon are decked at
+  WATER_LEVEL + 0.3 (point-in-polygon vs decimated water rings) so roads never dive
+  into the river/bay bed.
 - Terrain: heightfield mesh per chunk with vertex colors (grass/rock/sand by slope);
-  water level from Overture water polygons (flatten terrain below water).
+  water level from Overture water polygons (flatten terrain below water — visual only,
+  documented).
 - All per-chunk render geometry merged into few BufferGeometry batches, vertex colors,
   2–4 shared materials, no per-building materials, no naive voxel cubes.
 
@@ -63,9 +69,12 @@
 
 ## Physics
 - Rapier world per physics region; terrain heightfield (downsampled); buildings = box
-  colliders from footprint+height (≤ physics radius); vehicle = raycast vehicle;
-  walking = KinematicCharacterController (P1). Collider lifecycle tied to chunk
-  activation/eviction.
+  colliders from footprint+height (friction 0.35 — slides along walls, arcade feel),
+  within the physics radius; vehicle = raycast vehicle; collider lifecycle tied to
+  chunk activation/eviction. The spawn chunk's colliders are pre-created before the
+  car spawns (no fall-through). Vehicle recovery: R teleports to the nearest safe
+  road point (findSpawnPoint near) and recreates the vehicle controller (clears stale
+  wheel state). Walking = KinematicCharacterController (P1, deferred).
 
 ## UI
 - Plain DOM UI (no framework): search, loading stages, HUD, settings, debug overlay.
@@ -73,8 +82,9 @@
 
 ## Failure handling
 - Geocoder fail → offline gazetteer; data tile missing → neighbor/fallback + warning;
-  worker fail → restart worker once; cache corrupt → wipe that key; WebGL2 absent →
-  error screen with requirements (WebGPU not required).
+  chunk build fail → slot released + re-queued (no black hole); stale build results →
+  identity-guarded (no zombie chunks); cache corrupt → drop + self-healing accounting;
+  WebGL2 absent → error screen with requirements (WebGPU not required).
 
 ## Deployment
 - Static build, base "./", GitHub Pages workflow (pinned build) once paths stable.

@@ -25,10 +25,20 @@ deterministic counters only and marks the FPS gate BLOCKED_ENVIRONMENT where nee
 
 Governor adjusts within profile bounds with hysteresis; no rapid oscillation.
 
-## Radii (hypotheses, WP-06/11 profile)
-- Physics radius: 120 m
-- High-detail render radius: 300 m
-- Low-detail/prefetch radius: 900 m
+## Radii (measured, code truth — DEFAULT_STREAM_CONFIG)
+- Physics radius: 400 m
+- High-detail render radius: 1200 m
+- Low-detail/prefetch radius: 2400 m
+
+## Real-hardware evidence (2026-08-11, Chrome 151, ANGLE D3D11 Intel UHD)
+- FPS median 161-164 in all scenarios (target ≥55) — 3x over target.
+- Frame time p95 7.0-8.4 ms (target ≤25 ms, aim ≤20 ms).
+- Severe stalls: 1-2 at startup load burst; ZERO during driving (target: none repeated).
+- Memory: bounded 63-140 MB over 10-min traversal + 4-city revisit matrix (no monotonic growth).
+- Cache revisit: 100% hits, load 90 s → 64 s (hardware-revisit.json).
+- Chunk generation: async-batched, gen p95 ~690-895 ms wall time amortized across frames
+  (zero blocking); ring decimation bounds single-step cost.
+- Draw calls p50 ~30-53, triangles p50 ~200-285k.
 
 ## Honesty rule
 A PASS for the FPS gate requires real measured evidence on real hardware. In

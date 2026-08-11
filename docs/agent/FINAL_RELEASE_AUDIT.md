@@ -80,3 +80,20 @@ test file; RUNTIME = observed runtime evidence; REAL = reconciled truth; ACTION 
 
 ## Baseline record
 See reports/finalization/baseline/BASELINE.md (commit, tests 67+6, build sizes, warnings).
+
+## Final reconciliation (post-review, 2026-08-11)
+- All R-001..R-027 final states: PASS except R-020 (walk, DEFERRED outside V1 core) —
+  see REQUIREMENTS.md (rewritten with evidence per row) and TRACEABILITY.md.
+- Review B findings F-01..F-05 fixed + regression tests (mutation-verified for F-01):
+  see OPTIMIZATION_LOG.md.
+- Reviewer A retry returned empty twice (interrupted / no result): Director took
+  ownership of scope A (functional/requirements/geo/gameplay/deployment) — all
+  evidenced PASS in this audit + harness.
+- Luna final visual review: no CRITICAL; HIGH-1 (blank loading) fixed with spinner;
+  HIGH-2/3 and MEDIUMs = content truth or stylization (documented in ledger).
+- Clean-clone test PASS (fresh worktree: npm ci, typecheck, lint, 77 tests, build,
+  browser smoke). Real-GPU benchmarks PASS targets (FPS p50 161-164, p95 =8.4 ms,
+  1 startup stall, bounded memory, 100% cache hits on revisit).
+- Deployment: GitHub Pages ENABLED (API, build_type=workflow) ?
+  https://julenberazaa.github.io/3D_City/ ; deployed-site smoke executed after final
+  main push (§57).

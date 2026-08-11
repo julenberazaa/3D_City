@@ -28,7 +28,9 @@ async function waitForServer(t) {
   while (Date.now() - t0 < t) {
     try {
       if ((await get(`${BASE}/`)) === 200) return;
-    } catch {}
+    } catch {
+      // server not up yet; retry
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error("server not up");

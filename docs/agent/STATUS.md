@@ -1,28 +1,27 @@
 # STATUS — Executive Engineering State
 
-Updated: 2026-08-10 (final release round - SHIP)
+Updated: 2026-08-11 (final release — SHIP)
 
 States: NOT_STARTED / ACTIVE / PASS / FAIL / BLOCKED_EXTERNAL / DEFERRED_NONCRITICAL
 
-| ID | SCOPE | STATE | REQUIREMENTS | TESTS | EVIDENCE | NEXT |
-|---|---|---|---|---|---|---|
-| WP-00 | Env + harness + docs + model lock | ACTIVE | R-001..R-006 | harness smoke | run-id pending | finish harness + baseline |
-| WP-01 | Upstream reuse audit + architecture freeze | PASS | R-007 | audit doc + probes | reports/research + audits 2026-08-10 | WP-02 |
-| WP-02 | Static vertical slice — WP-02a geo foundation DONE, WP-02b fixtures DONE (SF downtown: 14,948 buildings, 12,890 roads, 16 terrain chunks), WP-02c generator+renderer+camera+smoke DONE (buildWorld determinism verified; 26 unit tests green; e2e smoke green; screenshot exists) | ACTIVE | R-004..R-006, R-010 | 26 unit tests + smoke e2e | fixtures/sf-downtown/, reports/visual/wp02-slice.png, harness 20260810-132940 | reviewer pass on WP-02c, then WP-03 |
-| WP-03 | Physics vertical slice — Rapier world (16 terrain heightfields + 14,004 building boxes), raycast vehicle (calibrated), keyboard controls, camera follow, safe spawn (building clearance), adaptive pixel ratio; drive e2e GREEN | PASS | R-011, R-016 (partial) | 37 unit tests + 2 e2e | reports/visual/wp03-drive.png, harness run 20260810-1913xx | WP-04 |
-| WP-04 | Geo fusion — GeoFusionPipeline (geo↔local, unified elevation policy, deterministic terrain edge stitching ≤1.64m→0, floating-origin rebase groundwork) wired into render+physics | PASS | R-012, R-008 (policy) | 43 unit tests + 2 e2e | tests/unit/fusion.test.ts | WP-05 |
-| WP-05 | Live data pipeline — shared fixture builder (byte-identical oracle), versioned chunk keys, browser live loader (Overture PMTiles + terrarium via ?bbox=), live e2e GREEN (San Jose area) | PASS | R-009, R-013 | 47 unit tests + 3 e2e (smoke/drive/live) | reports/visual/wp05-live.png | WP-06 |
-| WP-06 | Chunk streamer — ChunkManager (priority/cancellation/bounded queues/eviction), per-chunk render+physics, origin-aware chunk keys, slope-aware safe spawn; all e2e green incl. live | PASS | R-014, R-016 | 56 unit + 4 e2e | tests/unit/chunkManager.test.ts | WP-07 |
-| WP-07 | Persistent cache — IndexedDB LRU (200 MB), corruption tolerance, second-visit e2e cache-hit evidence | PASS | R-015 | 66 unit + 5 e2e | tests/unit/cache.test.ts, live.spec cache gate | WP-09/10 |
-| WP-08 | Place search — GeoNames gazetteer (34k, alias+digraph matching), Open-Meteo fallback, search landing UI | PASS | R-002 | 66 unit + 5 e2e | tests/unit/search.test.ts, search.spec | WP-09/10 |
-| WP-09 | World fidelity — roofs (gabled/hipped), parts, water, landcover, stitching | PASS (partial bridges/tunnels) | R-017..R-019 | fixture tests | generator tests | DEFERRED bridges refinement |
-| WP-10 | Walk mode | NOT_STARTED | R-020 | — | — | DEFERRED_NONCRITICAL (P1, not required for core experience) |
-| WP-11 | Performance hardening — adaptive DPR governor, per-chunk physics, bounded heap (51 MB during drive) | PASS (env-limited FPS) | R-022 | perf evidence | reports/performance/drive-session.json | hardware FPS gate BLOCKED_ENVIRONMENT |
-| WP-12 | UX/visual polish + Luna | ACTIVE | R-023 | screenshots | reports/visual/*.png | Luna final review pending |
-| WP-13 | Optional imagery | NOT_STARTED | (P3) | — | — | deferred |
-| WP-14 | Release/deploy — README, CI workflow, Pages deploy config | ACTIVE | R-024 | CI config | .github/workflows/ci.yml | final harness + reviews pending |
+| ID | SCOPE | STATE | REQUIREMENTS | TESTS | EVIDENCE |
+|---|---|---|---|---|---|
+| WP-00 | Env + harness + docs + model lock | PASS | R-001, R-027 | harness gates | harness run (final round) |
+| WP-01 | Upstream reuse audit + architecture freeze | PASS | R-007 | audit doc | docs/agent/UPSTREAM_REUSE_AUDIT.md |
+| WP-02 | Static slice (fixtures SF, generator, renderer, smoke) | PASS | R-004..R-006, R-010 | fixture + generator + smoke | reports/visual/final/02-fixture-world.png |
+| WP-03 | Physics slice (terrain/buildings colliders, raycast car, controls, safe spawn, recovery R) | PASS | R-011, R-016, R-021 | 12 physics tests + drive e2e | drive e2e (causality/ground-truth/R gates) |
+| WP-04 | Geo fusion (geo↔local, seams, stitching) | PASS | R-012 | fusion tests | tests/unit/fusion.test.ts |
+| WP-05 | Live data pipeline (Overture + terrarium, ?bbox=) | PASS | R-009, R-013 | live e2e | reports/visual/final/05-dense-city.png |
+| WP-06 | Chunk streamer (async batched generation, cancellable, bounded) | PASS | R-014, R-025 | chunkManager + streamer-race tests | stress benchmarks (45+ chunks) |
+| WP-07 | Persistent cache (LRU 200 MB, corruption, self-heal) | PASS | R-015 | cache tests | hardware-revisit.json (100% hits) |
+| WP-08 | Place search (gazetteer 34k + Open-Meteo fallback, a11y) | PASS | R-002, R-026 | search unit + 4 e2e | search e2e suite |
+| WP-09 | World fidelity (roofs, parts, water, landcover, stitching, bridge rule) | PASS | R-017..R-019 | fixture tests incl. bridge | bridge-rule fixture test |
+| WP-10 | Walk mode | DEFERRED_NONCRITICAL | R-020 | — | documented; outside V1 core |
+| WP-11 | Performance hardening (async generation, decimation, governor, real-GPU benchmark) | PASS | R-022 | render-quality tests + hardware benchmarks | FPS p50 161-164, p95 ≤8.4 ms, stalls 1, heap bounded |
+| WP-12 | UX/visual + Luna final review | PASS | R-023 | Luna 2 cycles | reports/visual/final/*.png |
+| WP-13 | Optional imagery (Panoramax) | DEFERRED_NONCRITICAL | (P3) | — | documented |
+| WP-14 | Release/deploy (README, CI, Pages enabled + verified) | PASS | R-024 | clean-clone test, CI, Pages | https://julenberazaa.github.io/3D_City/ |
 
-## Baseline (2026-08-10)
-- Repo: `julenberazaa/3D_City`, branch `main`, HEAD `7c699ad` ("Initial commit"), dirty (WP-02c uncommitted).
-- Node v24.13.0, npm 11.6.2, git 2.52.0.windows.1, Windows, OpenCode 1.17.9.
-- Model lock resolved (see MODEL_LOCK.md). Luna available in catalogue.
+## Baseline (original, 2026-08-10)
+- Repo: `julenberazaa/3D_City`, branch `main`, HEAD `7c699ad` at bootstrap; final `main` HEAD: see CONTINUATION.md.
+- Node v24.13.0, npm 11.6.2, Windows, Playwright chromium (SwiftShader for CI), real Chrome 151 for hardware benchmarks.

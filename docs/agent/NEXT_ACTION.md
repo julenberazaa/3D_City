@@ -1,9 +1,19 @@
 # NEXT ACTION — never lose the thread
 
-CURRENT MILESTONE: Final release (WP-14)
-CURRENT WORK PACKAGE: WP-14
-CURRENT BLOCKER: none
-NEXT SINGLE ACTION: Final adversarial review (fresh reviewer, P0 paths) + final Luna visual review (screenshots) → fix substantiated findings → full harness + clean-state gate → commit/push → SHIP verdict.
-WHY IT IS NEXT: all P0 requirements have passing evidence; only final independent verification + release evidence remain.
-ACCEPTANCE CONDITION: reviewer verdict, Luna findings resolved, full harness green, final commit pushed.
-EVIDENCE TO PRODUCE: reviews, harness run-id, final commit.
+CURRENT MILESTONE: Final release — SHIPPED.
+CURRENT WORK PACKAGE: none (WP-00..WP-14 final).
+CURRENT BLOCKER: none.
+NEXT SINGLE ACTION: No required engineering action remains. The release is deployed
+and verified (https://julenberazaa.github.io/3D_City/). Optional future work below.
+WHY IT IS NEXT: — (release complete).
+ACCEPTANCE CONDITION: —.
+EVIDENCE TO PRODUCE: —.
+
+## Optional future enhancements (NOT required for V1)
+- WP-10 walk mode (Rapier KinematicCharacterController).
+- Web Worker offload of chunk generation (documented in OPTIMIZATION_LOG; async
+  batching already meets the acceptance).
+- R-019 tunnel elevation handling (bridge rule covers the common case).
+- Water/coast terrain flattening under the water surface (visual coherence).
+- P2: full axe-style a11y audit, HUD sizing, fog washout tuning.
+- P3: Panoramax facade imagery, traffic/pedestrians.
