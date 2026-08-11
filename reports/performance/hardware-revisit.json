@@ -1,0 +1,62 @@
+[
+  {
+    "run": "dense-urban",
+    "wallLoadMs": 95219,
+    "worldLoadMs": 33483,
+    "heapFinalMB": 117.02,
+    "heapMaxMB": 127.85,
+    "cache": {
+      "hits": 0,
+      "misses": 65,
+      "evicted": 0,
+      "hitRate": 0
+    },
+    "distM": 871,
+    "fps": 163.93
+  },
+  {
+    "run": "normal-town",
+    "wallLoadMs": 108220,
+    "worldLoadMs": 46534,
+    "heapFinalMB": 129.25,
+    "heapMaxMB": 126.97,
+    "cache": {
+      "hits": 1,
+      "misses": 104,
+      "evicted": 0,
+      "hitRate": 1
+    },
+    "distM": 1215,
+    "fps": 163.93
+  },
+  {
+    "run": "mountain",
+    "wallLoadMs": 81840,
+    "worldLoadMs": 21390,
+    "heapFinalMB": 37.24,
+    "heapMaxMB": 36.45,
+    "cache": {
+      "hits": 0,
+      "misses": 96,
+      "evicted": 0,
+      "hitRate": 0
+    },
+    "distM": 387,
+    "fps": 163.93
+  },
+  {
+    "run": "dense-urban",
+    "wallLoadMs": 64776,
+    "worldLoadMs": 3233,
+    "heapFinalMB": 127.87,
+    "heapMaxMB": 147.44,
+    "cache": {
+      "hits": 65,
+      "misses": 0,
+      "evicted": 0,
+      "hitRate": 100
+    },
+    "distM": 1424,
+    "fps": 163.93
+  }
+]

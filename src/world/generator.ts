@@ -352,7 +352,34 @@ function buildLandcoverChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mes
   return { mesh: vb.toMesh(LANDCOVER_MATERIAL), count };
 }
 
-function buildRoadChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh: THREE.Mesh | null; count: number } {
+function pointInRing(px: number, pz: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i]![0];
+    const zi = ring[i]![1];
+    const xj = ring[j]![0];
+    const zj = ring[j]![1];
+    if (zi > pz !== zj > pz && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function waterRingsOf(fixture: WorldFixture): number[][][] {
+  const out: number[][][] = [];
+  for (const c of fixture.water) {
+    for (const f of c.features) {
+      if (!f.ring || f.ring.length < 3) continue;
+      out.push(decimateRing(distinctPoints(f.ring)));
+    }
+  }
+  return out;
+}
+
+function buildRoadChunkMesh(
+  c: ChunkRecord,
+  terrain: ChunkTerrain[],
+  waterRings: number[][][],
+): { mesh: THREE.Mesh | null; count: number } {
   const vb = new VertexBuilder();
   let count = 0;
   for (const f of c.features) {
@@ -385,9 +412,12 @@ function buildRoadChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh: TH
         dz /= len;
       }
       const h = sampleTerrain(terrain, pts[i][0], pts[i][1]) + 0.06;
+      const overWater = waterRings.some((ring) => pointInRing(pts[i][0], pts[i][1], ring));
       left.push([pts[i][0] + (-dz) * (width / 2), pts[i][1] + dx * (width / 2)]);
       right.push([pts[i][0] - (-dz) * (width / 2), pts[i][1] - dx * (width / 2)]);
-      y.push(h);
+      // Bridge rule: roads crossing water are decks at the water surface so
+      // they never dive into the bay/river bed (WP-09/R-019 minimal set).
+      y.push(overWater ? WATER_LEVEL + 0.3 : h);
     }
     for (let i = 0; i < pts.length - 1; i++) {
       const ax = left[i][0];
@@ -576,7 +606,7 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
     counts[countKey] += count;
     if (mesh) group.add(mesh);
   };
-  addChunk(fixture.roads, (c) => buildRoadChunkMesh(c, fixture.terrain), "roads");
+  addChunk(fixture.roads, (c) => buildRoadChunkMesh(c, fixture.terrain, waterRingsOf(fixture)), "roads");
   yield;
   addChunk(fixture.water, (c) => buildWaterChunkMesh(c), "waterPolys");
   yield;
@@ -623,7 +653,7 @@ export function buildWorld(fixture: WorldFixture): WorldModel {
   const provenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
 
   for (const c of fixture.roads) {
-    const { mesh, count } = buildRoadChunkMesh(c, fixture.terrain);
+    const { mesh, count } = buildRoadChunkMesh(c, fixture.terrain, waterRingsOf(fixture));
     counts.roads += count;
     if (mesh) {
       const group = new THREE.Group();

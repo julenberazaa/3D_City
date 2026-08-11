@@ -2,11 +2,11 @@
   "scenario": "mountain",
   "label": "Zermatt (mountainous)",
   "bbox": "7.73,45.99,7.78,46.03",
-  "wallLoadMs": 205855,
+  "wallLoadMs": 149470,
   "result": {
-    "startedAt": "2026-08-11T10:39:31.147Z",
-    "durationSec": 0,
-    "stoppedBy": "time",
+    "startedAt": "2026-08-11T12:32:07.537Z",
+    "durationSec": 128,
+    "stoppedBy": "distance",
     "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "vendor": "Google Inc. (Intel)",
     "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
@@ -20,64 +20,62 @@
       "height": 800
     },
     "worldLabel": "live (live)",
-    "worldLoadMs": 24247,
+    "worldLoadMs": 20613,
     "frames": {
-      "count": 29717,
+      "count": 21132,
       "fpsMedian": 163.93,
-      "fpsMin": 2.21,
+      "fpsMin": 6.3,
       "frameMs": {
         "p50": 6.1,
-        "p95": 7.4,
-        "p99": 8.1,
-        "max": 451.7
+        "p95": 7.2,
+        "p99": 7.9,
+        "max": 158.8
       },
-      "longFrames50ms": 3,
-      "severeStalls250ms": 1,
-      "stallTimesMs": [
-        452
-      ]
+      "longFrames50ms": 4,
+      "severeStalls250ms": 0,
+      "stallTimesMs": []
     },
     "distance": {
-      "totalM": 566,
+      "totalM": 2031,
       "maxSpeedKmh": 42.6,
-      "avgSpeedKmh": 11.4
+      "avgSpeedKmh": 14.8
     },
     "render": {
       "drawCalls": {
-        "p50": 24,
+        "p50": 26,
         "p95": 28
       },
       "triangles": {
-        "p50": 18236,
-        "p95": 21635
+        "p50": 20630,
+        "p95": 21505
       },
-      "geometries": 52,
+      "geometries": 45,
       "textures": 0
     },
     "stream": {
       "activeMax": 14,
       "queuedMax": 0,
       "fetchingMax": 0,
-      "generatingMax": 0,
+      "generatingMax": 3,
       "cancelled": 0,
-      "activated": 14,
-      "evicted": 0,
+      "activated": 16,
+      "evicted": 3,
       "lateChunks": 1,
       "genMs": {
-        "p50": 14.5,
-        "p95": 61.7,
-        "max": 61.7,
-        "count": 14
+        "p50": 106.1,
+        "p95": 148.5,
+        "max": 148.5,
+        "count": 16
       }
     },
     "autopilot": {
-      "recoveries": 3,
+      "recoveries": 1,
       "maxStallSec": 3,
-      "relocations": 0
+      "relocations": 2
     },
     "physics": {
-      "chunksMax": 2,
-      "buildingsMax": 102
+      "chunksMax": 4,
+      "buildingsMax": 135
     },
     "cache": {
       "hits": 0,
@@ -86,9 +84,9 @@
       "hitRate": 0
     },
     "heap": {
-      "usedMBMax": 41.87,
-      "usedMBFinal": 25.79,
-      "samples": 179
+      "usedMBMax": 43.63,
+      "usedMBFinal": 28.35,
+      "samples": 127
     },
     "errors": {
       "count": 0,

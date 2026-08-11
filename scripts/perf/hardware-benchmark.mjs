@@ -103,6 +103,34 @@ async function main() {
       executablePath: CHROME,
     });
     try {
+      if (args.includes("--revisit")) {
+        const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        const page = await context.newPage();
+        const revisit = [];
+        for (const n of ["dense-urban", "normal-town", "mountain", "dense-urban"]) {
+          const cfg = SCENARIOS[n];
+          const url = `${BASE}/?bbox=${cfg.bbox}&benchmark=1&bench_seconds=60&bench_dist=3000`;
+          const t0 = Date.now();
+          await page.goto(url, { waitUntil: "domcontentloaded" });
+          await page.waitForFunction(() => window.__benchmarkDone, null, { timeout: 900000 });
+          const result = await page.evaluate(() => window.__benchmarkResult);
+          if (looksSoftware(result.renderer)) throw new Error(`run ${n} rejected: software renderer`);
+          revisit.push({
+            run: n,
+            wallLoadMs: Date.now() - t0,
+            worldLoadMs: result.worldLoadMs,
+            heapFinalMB: result.heap.usedMBFinal,
+            heapMaxMB: result.heap.usedMBMax,
+            cache: result.cache,
+            distM: result.distance.totalM,
+            fps: result.frames.fpsMedian,
+          });
+          console.log(`[revisit:${n}] load ${(Date.now() - t0) / 1000}s heap ${result.heap.usedMBFinal}MB cache ${JSON.stringify(result.cache)}`);
+        }
+        writeFileSync(join(OUT_DIR, "hardware-revisit.json"), JSON.stringify(revisit, null, 2));
+        await context.close();
+        return;
+      }
       const runs = runList.map((n) =>
         n.startsWith("fixture=")
           ? { name: n, cfg: { fixture: n.slice(8), label: `fixture ${n.slice(8)}`, seconds: 60, dist: 1000 } }

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readFixture } from "./fixture-helper";
+import { buildChunkGroup, WATER_LEVEL } from "../../src/world/generator";
 
 const fixtureDir = fileURLToPath(new URL("../../fixtures/sf-downtown", import.meta.url));
 
@@ -108,5 +110,51 @@ describe("gate 08: sf-downtown fixture (pinned data)", () => {
   it("has at least one water or landcover polygon", () => {
     const total = countFeatures(water) + countFeatures(landcover);
     expect(total).toBeGreaterThanOrEqual(1);
+  });
+
+  it("bridge rule: no road vertex over water is below the water surface", () => {
+    const fixture = readFixture("sf-downtown");
+    const waterRings: number[][][] = [];
+    for (const c of fixture.water) {
+      for (const f of c.features) {
+        if (!f.ring || f.ring.length < 3) continue;
+        waterRings.push(f.ring);
+      }
+    }
+    const pointInRing = (px: number, pz: number, ring: number[][]): boolean => {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i]![0];
+        const zi = ring[i]![1];
+        const xj = ring[j]![0];
+        const zj = ring[j]![1];
+        if (zi > pz !== zj > pz && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside;
+      }
+      return inside;
+    };
+    let roadVertsOverWater = 0;
+    let belowSurface = 0;
+    for (const c of fixture.buildings) {
+      const group = buildChunkGroup(fixture, 15, c.x, c.y).group;
+      group.traverse((o) => {
+        const m = o as { isMesh?: boolean; geometry?: { attributes?: Record<string, { array?: Float32Array }> } };
+        if (!m.isMesh || !m.geometry?.attributes?.position) return;
+        const pos = m.geometry.attributes.position!.array!;
+        const col = m.geometry.attributes.color?.array;
+        if (!col) return;
+        for (let i = 0; i < pos.length; i += 3) {
+          const r = col[i];
+          if (Math.abs(r - 0.32) > 0.05) continue;
+          const x = pos[i];
+          const z = pos[i + 2];
+          if (waterRings.some((ring) => pointInRing(x, z, ring))) {
+            roadVertsOverWater++;
+            if (pos[i + 1] < WATER_LEVEL - 0.01) belowSurface++;
+          }
+        }
+      });
+    }
+    expect(roadVertsOverWater).toBeGreaterThan(0);
+    expect(belowSurface).toBe(0);
   });
 });

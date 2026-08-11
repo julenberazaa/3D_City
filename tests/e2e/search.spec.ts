@@ -49,3 +49,40 @@ test("search: keyboard Enter picks the top result", async ({ page }) => {
   await page.locator("#place-input").press("Enter");
   await page.waitForURL(/\?bbox=/, { timeout: 15000 });
 });
+
+test("search: arrow keys navigate results and Enter picks the selection (a11y)", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto("/");
+  await expect(page.locator("#place-input")).toBeVisible({ timeout: 30000 });
+  await page.locator("#place-input").fill("berlin");
+  await page.waitForSelector("#place-results li", { timeout: 20000 });
+  const input = page.locator("#place-input");
+
+  await input.press("ArrowDown");
+  await expect(input).toHaveAttribute("aria-expanded", "true");
+  await expect(input).toHaveAttribute("aria-activedescendant", "place-opt-0");
+  await expect(page.locator("#place-opt-0")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#place-opt-1")).toHaveAttribute("aria-selected", "false");
+
+  await input.press("ArrowDown");
+  await expect(input).toHaveAttribute("aria-activedescendant", "place-opt-1");
+  await expect(page.locator("#place-opt-1")).toHaveAttribute("aria-selected", "true");
+
+  await input.press("ArrowUp");
+  await expect(input).toHaveAttribute("aria-activedescendant", "place-opt-0");
+
+  await input.press("Enter");
+  await page.waitForURL(/\?bbox=/, { timeout: 15000 });
+});
+
+test("search: status announces loading/ready with live regions", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto("/?fixture=sf-downtown");
+  await page.waitForFunction(
+    () => document.querySelector("#status")?.textContent?.includes("Ready"),
+    { timeout: 120000 },
+  );
+  const status = page.locator("#status");
+  await expect(status).toHaveAttribute("role", "status");
+  await expect(status).toHaveAttribute("aria-live", "polite");
+});

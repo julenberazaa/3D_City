@@ -36,7 +36,7 @@ export interface BenchmarkResult {
     severeStalls250ms: number;
     stallTimesMs: number[];
   };
-  distance: { totalM: number; maxSpeedKmh: number; avgSpeedKmh: number };
+  distance: { totalM: number; drivenM: number; teleportedM: number; maxSpeedKmh: number; avgSpeedKmh: number };
   render: { drawCalls: { p50: number; p95: number }; triangles: { p50: number; p95: number }; geometries: number; textures: number };
   stream: {
     activeMax: number;
@@ -124,6 +124,8 @@ export function startBenchmark(params: BenchmarkParams, deps: BenchmarkDeps): Be
   let lastT = performance.now();
   let lastPos = { x: deps.startPos.x, z: deps.startPos.z };
   let dist = 0;
+  let drivenDist = 0;
+  let teleportDist = 0;
   let maxSpeed = 0;
   let speedSum = 0;
   let speedCount = 0;
@@ -153,15 +155,15 @@ export function startBenchmark(params: BenchmarkParams, deps: BenchmarkDeps): Be
       return;
     }
     const segLen = Math.hypot(best.bx - best.ax, best.bz - best.az);
-    const aheadX = best.px + ((best.bx - best.ax) / segLen) * 30;
-    const aheadZ = best.pz + ((best.bz - best.az) / segLen) * 30;
+    const aheadX = best.px + ((best.bx - best.ax) / segLen) * 45;
+    const aheadZ = best.pz + ((best.bz - best.az) / segLen) * 45;
     const want = Math.atan2(aheadX - p.x, aheadZ - p.z);
     let diff = want - h;
     while (diff > Math.PI) diff -= 2 * Math.PI;
     while (diff < -Math.PI) diff += 2 * Math.PI;
-    const steerAmt = Math.max(-1, Math.min(1, diff * 1.6));
-    const sharp = Math.abs(diff) > 0.9;
-    deps.controls.throttle = sharp ? 0.35 : 0.75;
+    const steerAmt = Math.max(-1, Math.min(1, diff * 1.4));
+    const sharp = Math.abs(diff) > 0.8;
+    deps.controls.throttle = sharp ? 0.35 : 0.85;
     deps.controls.steer = steerAmt;
     deps.controls.brake = 0;
   };
@@ -233,6 +235,8 @@ export function startBenchmark(params: BenchmarkParams, deps: BenchmarkDeps): Be
       },
       distance: {
         totalM: Math.round(dist),
+        drivenM: Math.round(drivenDist),
+        teleportedM: Math.round(teleportDist),
         maxSpeedKmh: Math.round(maxSpeed * 10) / 10,
         avgSpeedKmh: speedCount ? Math.round((speedSum / speedCount) * 10) / 10 : 0,
       },
@@ -383,6 +387,8 @@ export function startBenchmark(params: BenchmarkParams, deps: BenchmarkDeps): Be
     const pos = deps.car.position();
     const d = Math.hypot(pos.x - lastPos.x, pos.z - lastPos.z);
     dist += d;
+    if (d > 50) teleportDist += d;
+    else drivenDist += d;
     lastPos = { x: pos.x, z: pos.z };
     if (speed > maxSpeed) maxSpeed = speed;
     speedSum += speed;
@@ -415,7 +421,7 @@ export function startBenchmark(params: BenchmarkParams, deps: BenchmarkDeps): Be
       }
     }
 
-    if (elapsedSec >= params.seconds || dist >= params.dist) {
+    if (elapsedSec >= params.seconds || drivenDist >= params.dist) {
       finish(elapsedSec >= params.seconds ? "time" : "distance");
     }
   };

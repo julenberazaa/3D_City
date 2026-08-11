@@ -63,6 +63,8 @@ const hudEl = document.getElementById("hud")!;
 function setStatus(text: string, isError = false): void {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
+  statusEl.setAttribute("role", isError ? "alert" : "status");
+  statusEl.setAttribute("aria-live", isError ? "assertive" : "polite");
 }
 
 async function loadJson<T>(path: string, stage: string): Promise<T> {
@@ -93,9 +95,10 @@ async function showSearch(): Promise<void> {
   container.innerHTML = `
     <h1>3D City</h1>
     <p class="search-sub">Search any settlement and explore it as a stylized miniature world.</p>
-    <input id="place-input" type="search" placeholder="City, town or village…" autocomplete="off" aria-label="Search a place" />
+    <input id="place-input" type="search" placeholder="City, town or village…" autocomplete="off" aria-label="Search a place" aria-controls="place-results" aria-activedescendant="" role="combobox" aria-expanded="false" />
     <ul id="place-results" class="place-results" role="listbox" aria-label="Search results"></ul>
     <button id="demo-btn" class="demo-btn">Explore the demo (San Francisco)</button>
+    <p class="search-hint">Type a place, use ↑/↓ to choose, Enter to explore. In-game: WASD/arrows drive, R recovers the car, C camera, H HUD.</p>
   `;
   root.appendChild(container);
 
@@ -108,20 +111,40 @@ async function showSearch(): Promise<void> {
 
   let index: ReturnType<typeof buildGazetteerIndex> | null = null;
   let pendingQuery = "";
+  let activeOption = -1;
+
+  const selectOption = (i: number): void => {
+    const lis = resultsEl.querySelectorAll("li");
+    activeOption = Math.max(-1, Math.min(lis.length - 1, i));
+    for (let k = 0; k < lis.length; k++) {
+      const li = lis[k]!;
+      li.setAttribute("aria-selected", String(k === activeOption));
+      li.classList.toggle("selected", k === activeOption);
+    }
+    const active = lis[activeOption];
+    input.setAttribute("aria-activedescendant", active ? active.id : "");
+    input.setAttribute("aria-expanded", String(lis.length > 0));
+    active?.scrollIntoView({ block: "nearest" });
+  };
 
   const render = (items: { name: string; country: string; admin1: string; population: number; lat: number; lon: number }[]): void => {
     resultsEl.innerHTML = "";
     for (const item of items) {
       const li = document.createElement("li");
+      li.id = `place-opt-${items.indexOf(item)}`;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", "false");
+      li.tabIndex = -1;
       const label = `${item.name}${item.country ? `, ${item.country}` : ""}${item.admin1 && item.admin1 !== item.country ? ` (${item.admin1})` : ""}`;
       li.textContent = label;
-      li.setAttribute("role", "option");
       li.addEventListener("click", () => {
         const d = 0.022;
         window.location.search = `?bbox=${(item.lon - d).toFixed(4)},${(item.lat - d).toFixed(4)},${(item.lon + d).toFixed(4)},${(item.lat + d).toFixed(4)}`;
       });
       resultsEl.appendChild(li);
     }
+    activeOption = -1;
+    selectOption(-1);
   };
 
   async function runSearch(q: string): Promise<void> {
@@ -162,9 +185,17 @@ async function showSearch(): Promise<void> {
     }, 180);
   });
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const first = resultsEl.querySelector("li");
-      first?.dispatchEvent(new MouseEvent("click"));
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectOption(activeOption + 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectOption(activeOption - 1);
+    } else if (e.key === "Enter") {
+      const li = resultsEl.querySelectorAll("li")[Math.max(0, activeOption)];
+      li?.dispatchEvent(new MouseEvent("click"));
+    } else if (e.key === "Escape") {
+      selectOption(-1);
     }
   });
 }

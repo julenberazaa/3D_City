@@ -2,11 +2,11 @@
   "scenario": "dense-urban",
   "label": "Manhattan (dense urban)",
   "bbox": "-74.015,40.700,-73.960,40.735",
-  "wallLoadMs": 268897,
+  "wallLoadMs": 650141,
   "result": {
-    "startedAt": "2026-08-11T12:16:35.123Z",
-    "durationSec": 248,
-    "stoppedBy": "distance",
+    "startedAt": "2026-08-11T13:03:32.261Z",
+    "durationSec": 602,
+    "stoppedBy": "time",
     "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
     "vendor": "Google Inc. (Intel)",
     "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
@@ -20,38 +20,40 @@
       "height": 800
     },
     "worldLabel": "live (live)",
-    "worldLoadMs": 20585,
+    "worldLoadMs": 48139,
     "frames": {
-      "count": 40447,
+      "count": 97792,
       "fpsMedian": 163.93,
-      "fpsMin": 3.01,
+      "fpsMin": 2.22,
       "frameMs": {
         "p50": 6.1,
-        "p95": 7,
-        "p99": 8.1,
-        "max": 332.7
+        "p95": 7.3,
+        "p99": 8.6,
+        "max": 451.3
       },
-      "longFrames50ms": 12,
+      "longFrames50ms": 28,
       "severeStalls250ms": 1,
       "stallTimesMs": [
-        333
+        451
       ]
     },
     "distance": {
-      "totalM": 5607,
-      "maxSpeedKmh": 27,
-      "avgSpeedKmh": 4.9
+      "totalM": 13526,
+      "drivenM": 518,
+      "teleportedM": 13008,
+      "maxSpeedKmh": 33.2,
+      "avgSpeedKmh": 5
     },
     "render": {
       "drawCalls": {
-        "p50": 36,
-        "p95": 44
+        "p50": 39,
+        "p95": 48
       },
       "triangles": {
-        "p50": 184617,
-        "p95": 224312
+        "p50": 167025,
+        "p95": 254032
       },
-      "geometries": 50,
+      "geometries": 64,
       "textures": 0
     },
     "stream": {
@@ -60,24 +62,24 @@
       "fetchingMax": 0,
       "generatingMax": 9,
       "cancelled": 0,
-      "activated": 23,
-      "evicted": 9,
+      "activated": 53,
+      "evicted": 39,
       "lateChunks": 1,
       "genMs": {
-        "p50": 166.8,
-        "p95": 694.9,
-        "max": 803.4,
-        "count": 23
+        "p50": 103.3,
+        "p95": 894.6,
+        "max": 938.9,
+        "count": 53
       }
     },
     "autopilot": {
-      "recoveries": 1,
+      "recoveries": 3,
       "maxStallSec": 3,
-      "relocations": 9
+      "relocations": 22
     },
     "physics": {
       "chunksMax": 4,
-      "buildingsMax": 5866
+      "buildingsMax": 5583
     },
     "cache": {
       "hits": 0,
@@ -86,9 +88,9 @@
       "hitRate": 0
     },
     "heap": {
-      "usedMBMax": 105.68,
-      "usedMBFinal": 96.06,
-      "samples": 246
+      "usedMBMax": 139.97,
+      "usedMBFinal": 66.36,
+      "samples": 598
     },
     "errors": {
       "count": 0,
