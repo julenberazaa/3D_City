@@ -30,7 +30,10 @@ function parseBbox(raw: string): [number, number, number, number] | null {
 }
 
 const FIXTURE = "sf-downtown";
-const BASE = `/fixtures/${FIXTURE}`;
+// Base-aware asset paths: the app is served under a subpath on GitHub Pages
+// (/3D_City/), so fixtures must resolve relative to the deployment root.
+const BASE = new URL(`${import.meta.env.BASE_URL}fixtures/${FIXTURE}`, window.location.href).pathname;
+const GAZETTEER_URL = new URL(`${import.meta.env.BASE_URL}fixtures/gazetteer.json`, window.location.href).pathname;
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 12;
@@ -167,7 +170,7 @@ async function showSearch(): Promise<void> {
 
   void (async () => {
     try {
-      const res = await fetch("/fixtures/gazetteer.json");
+      const res = await fetch(GAZETTEER_URL);
       if (res.ok) {
         const raw = (await res.json()) as { entries: GazetteerEntry[] };
         index = buildGazetteerIndex(raw.entries);
