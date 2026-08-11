@@ -4,6 +4,22 @@ export const FOG_COLOR = 0xb8cfe0;
 export const FOG_NEAR = 800;
 export const FOG_FAR = 4000;
 
+/** Exponential moving average of frame time; frameMs is the last frame's ms. */
+export function nextEma(currentMs: number, frameMs: number): number {
+  return currentMs * 0.9 + frameMs * 0.1;
+}
+
+/**
+ * Quality governor (pure): lower the pixel ratio when frames are very slow
+ * (>140 ms EMA), restore it when the load recovers (<60 ms EMA). Hysteresis
+ * + 2 s cooldown (enforced by the caller) prevent oscillation.
+ */
+export function chooseDpr(emaMs: number, current: number, max: number): number {
+  if (emaMs > 140 && current > 1) return 1;
+  if (emaMs < 60 && current < max) return max;
+  return current;
+}
+
 export interface RendererHandle {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -40,12 +56,7 @@ export function createRenderer(): RendererHandle {
   const adapt = (now: number): void => {
     if (now - lastAdapt < 2000) return;
     lastAdapt = now;
-    const current = renderer.getPixelRatio();
-    if (emaFrameMs > 140 && current > 1) {
-      renderer.setPixelRatio(1);
-    } else if (emaFrameMs < 60 && current < dpr) {
-      renderer.setPixelRatio(dpr);
-    }
+    renderer.setPixelRatio(chooseDpr(emaFrameMs, renderer.getPixelRatio(), dpr));
   };
 
   return {
@@ -68,9 +79,10 @@ export function createRenderer(): RendererHandle {
       let last = performance.now();
       const frame = (now: number) => {
         rafId = requestAnimationFrame(frame);
-        const dt = Math.min(0.1, (now - last) / 1000);
+        const frameMs = now - last;
         last = now;
-        emaFrameMs = emaFrameMs * 0.9 + (now - last) * 0.1;
+        const dt = Math.min(0.1, frameMs / 1000);
+        emaFrameMs = nextEma(emaFrameMs, frameMs);
         frameCount++;
         if (frameCount > 30) adapt(now);
         if (updateCb) updateCb(dt);

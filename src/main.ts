@@ -4,8 +4,9 @@ import { init as rapierInit } from "@dimforge/rapier3d-compat";
 import { type ChunkRecord, type ChunkTerrain, type WorldFixture } from "./world/generator";
 import { createOrbitCamera } from "./render/camera";
 import { createRenderer } from "./render/renderer";
-import { createStreamingPhysicsWorld, findSpawnPoint } from "./physics/world";
+import { createStreamingPhysicsWorld, findSpawnPoint, createPhysicsChunk } from "./physics/world";
 import { createCar } from "./physics/vehicle";
+import { chunkKeyOf } from "./stream/chunkManager";
 import { createCarVisual } from "./render/car";
 import { createControls } from "./input/controls";
 import { prepareFixture, sampleTerrain } from "./geo/fusion";
@@ -235,6 +236,10 @@ async function boot(): Promise<void> {
 
     const physics = createStreamingPhysicsWorld(fixture);
     const spawn = findSpawnPoint(fixture.roads, fixture.terrain, fixture);
+    // The spawn chunk's colliders must exist BEFORE the car spawns: streaming
+    // activates physics asynchronously, and a car that spawns into a void
+    // falls through the terrain and gets expelled by the solver.
+    createPhysicsChunk(physics, chunkKeyOf(fixture.manifest.origin, spawn.x, spawn.z));
     const vehicle = createCar(physics.world, spawn);
     setStatus("Ready");
 

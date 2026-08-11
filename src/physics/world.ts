@@ -149,6 +149,28 @@ export function findSpawnPoint(
     return { x: cand.x, y: base + 0.6, z: cand.z, heading: cand.heading };
   };
 
+  /**
+   * Prefer spawns with a long clear run ahead: dead-end roads (e.g. footways
+   * ending at a waterfront wall) wedge the car within seconds. Scores the
+   * candidate by how many of the 12/30/60/90 m-ahead points stay clear of
+   * buildings and water; ties go to the nearest road point.
+   */
+  const clearRunOf = (cand: { x: number; z: number; heading: number }): number => {
+    const fx = Math.sin(cand.heading);
+    const fz = Math.cos(cand.heading);
+    let run = 0;
+    for (const d of [12, 30, 60, 90]) {
+      if (clear(cand.x + fx * d, cand.z + fz * d)) run++;
+      else break;
+    }
+    return run;
+  };
+  const scored = candidates
+    .filter((c) => tryCandidate(c) !== null)
+    .map((c) => ({ ...c, run: clearRunOf(c) }));
+  scored.sort((a, b) => b.run - a.run || a.dist - b.dist);
+  if (scored.length > 0) return tryCandidate(scored[0])!;
+
   for (const cand of candidates.slice(0, 2000)) {
     const ok = tryCandidate(cand);
     if (ok) return ok;

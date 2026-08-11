@@ -75,6 +75,39 @@ describe("chunk cache (R-015)", () => {
     expect(c.statsSnapshot().misses).toBe(1);
   });
 
+  it("byte accounting self-heals after a corrupted read drop (no premature eviction)", async () => {
+    const b = new MemoryBackend();
+    const c = new ChunkCache(b, 8 * KB);
+    await c.put("good", new ArrayBuffer(4 * KB));
+    await c.put("bad", new ArrayBuffer(2 * KB));
+    b.failOnGet.add("bad");
+    await c.get("bad"); // drop + miss; stats.sizeBytes still counts 2KB phantom
+    expect(c.statsSnapshot().sizeBytes).toBe(6 * KB); // phantom bytes present
+    // Exceed the budget: enforceBudget recomputes from backend ground truth
+    // (good 4KB + trigger 4KB = 8KB ≤ budget) so no entry is evicted and the
+    // phantom 2KB is gone instead of evicting a live entry.
+    await c.put("trigger", new ArrayBuffer(4 * KB));
+    const s = c.statsSnapshot();
+    expect(s.sizeBytes).toBe(8 * KB);
+    expect(s.entries).toBe(2);
+    expect(await c.get("good")).not.toBeUndefined();
+    expect(await c.get("trigger")).not.toBeUndefined();
+  });
+
+  it("concurrent puts never corrupt budget accounting (mutex)", async () => {
+    const b = new MemoryBackend();
+    const c = new ChunkCache(b, 8 * KB);
+    await Promise.all([
+      c.put("a", new ArrayBuffer(3 * KB)),
+      c.put("b", new ArrayBuffer(3 * KB)),
+      c.put("c", new ArrayBuffer(3 * KB)),
+      c.put("d", new ArrayBuffer(3 * KB)),
+    ]);
+    const s = c.statsSnapshot();
+    expect(s.sizeBytes).toBeLessThanOrEqual(8 * KB);
+    expect(s.entries).toBeLessThanOrEqual(2);
+  });
+
   it("put failure does not throw (bounded resilience)", async () => {
     const b = new MemoryBackend();
     const orig = b.put.bind(b);

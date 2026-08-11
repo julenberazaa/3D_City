@@ -33,6 +33,7 @@ export interface CacheStats {
  */
 export class ChunkCache {
   private stats: CacheStats = { hits: 0, misses: 0, sizeBytes: 0, entries: 0, evicted: 0 };
+  private budgetRunning = false;
 
   constructor(
     private backend: CacheBackend,
@@ -51,7 +52,8 @@ export class ChunkCache {
         return rec.bytes;
       }
     } catch {
-      // corrupted read: drop and count as miss
+      // corrupted read: drop and count as miss (byte accounting self-heals
+      // on the next enforceBudget, which recomputes from backend ground truth)
       await this.backend.delete(key).catch(() => undefined);
     }
     this.stats.misses++;
@@ -74,31 +76,43 @@ export class ChunkCache {
   }
 
   private async enforceBudget(): Promise<void> {
-    if (this.stats.sizeBytes <= this.maxBytes) return;
-    let keys: string[];
+    if (this.budgetRunning) return;
+    this.budgetRunning = true;
     try {
-      keys = await this.backend.keys();
-    } catch {
-      return;
-    }
-    const meta: Array<{ key: string; size: number; at: number }> = [];
-    for (const k of keys) {
+      if (this.stats.sizeBytes <= this.maxBytes) return;
+      let keys: string[];
       try {
-        const rec = await this.backend.get(k);
-        meta.push({ key: k, size: rec?.size ?? 0, at: rec?.storedAt ?? 0 });
+        keys = await this.backend.keys();
       } catch {
-        meta.push({ key: k, size: 0, at: 0 });
+        return;
       }
-    }
-    meta.sort((a, b) => a.at - b.at);
-    let total = meta.reduce((s, m) => s + m.size, 0);
-    for (const m of meta) {
-      if (total <= this.maxBytes) break;
-      await this.backend.delete(m.key).catch(() => undefined);
-      total -= m.size;
-      this.stats.evicted++;
-      this.stats.entries = Math.max(0, this.stats.entries - 1);
-      this.stats.sizeBytes = Math.max(0, this.stats.sizeBytes - m.size);
+      const meta: Array<{ key: string; size: number; at: number }> = [];
+      for (const k of keys) {
+        try {
+          const rec = await this.backend.get(k);
+          meta.push({ key: k, size: rec?.size ?? 0, at: rec?.storedAt ?? 0 });
+        } catch {
+          meta.push({ key: k, size: 0, at: 0 });
+        }
+      }
+      // Self-heal: recompute byte/entry accounting from backend ground truth
+      // (a corrupted-read drop or a failed write may have drifted the stats).
+      const total = meta.reduce((s, m) => s + m.size, 0);
+      this.stats.sizeBytes = total;
+      this.stats.entries = meta.length;
+      if (total <= this.maxBytes) return;
+      meta.sort((a, b) => a.at - b.at);
+      let remaining = total;
+      for (const m of meta) {
+        if (remaining <= this.maxBytes) break;
+        await this.backend.delete(m.key).catch(() => undefined);
+        remaining -= m.size;
+        this.stats.evicted++;
+        this.stats.entries = Math.max(0, this.stats.entries - 1);
+        this.stats.sizeBytes = Math.max(0, this.stats.sizeBytes - m.size);
+      }
+    } finally {
+      this.budgetRunning = false;
     }
   }
 }

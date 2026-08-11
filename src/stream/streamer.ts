@@ -77,25 +77,39 @@ export function createStreamer(scene: THREE.Scene, physics: PhysicsWorld, fixtur
     if (pendingBuilds.has(key)) return;
     const pending = { cancelled: false, t0: performance.now() };
     pendingBuilds.set(key, pending);
-    void buildChunkAsync(key, pending).then((built) => {
-      pendingBuilds.delete(key);
-      if (!built) return;
-      const group = built.group;
-      groups.set(key, group);
-      counts.set(key, built.counts);
-      provenance.set(key, built.provenance);
-      scene.add(group);
-      activeCounts.buildings += built.counts.buildings;
-      activeCounts.roads += built.counts.roads;
-      activeCounts.waterPolys += built.counts.waterPolys;
-      activeCounts.landcover += built.counts.landcover;
-      activeProvenance.observed += built.provenance.observed;
-      activeProvenance.derived += built.provenance.derived;
-      activeProvenance.inferred += built.provenance.inferred;
-      manager.setState(key, "generating", "active");
-      handle.onChunkActivated?.(key);
-      handle.onChunkBuilt?.(key, performance.now() - pending.t0);
-    });
+    void buildChunkAsync(key, pending).then(
+      (built) => {
+        // Identity guard: if this record was superseded (evicted and re-queued,
+        // then a NEW build owns the slot), the stale build must not touch it.
+        if (pendingBuilds.get(key) !== pending) return;
+        pendingBuilds.delete(key);
+        if (!built) return;
+        const group = built.group;
+        groups.set(key, group);
+        counts.set(key, built.counts);
+        provenance.set(key, built.provenance);
+        scene.add(group);
+        activeCounts.buildings += built.counts.buildings;
+        activeCounts.roads += built.counts.roads;
+        activeCounts.waterPolys += built.counts.waterPolys;
+        activeCounts.landcover += built.counts.landcover;
+        activeProvenance.observed += built.provenance.observed;
+        activeProvenance.derived += built.provenance.derived;
+        activeProvenance.inferred += built.provenance.inferred;
+        manager.setState(key, "generating", "active");
+        handle.onChunkActivated?.(key);
+        handle.onChunkBuilt?.(key, performance.now() - pending.t0);
+      },
+      (err) => {
+        // A failed build must not black-hole the chunk slot forever: release
+        // the pending record and move the manager state out of "generating"
+        // so the chunk can be re-queued on the next update.
+        if (pendingBuilds.get(key) !== pending) return;
+        pendingBuilds.delete(key);
+        console.error(`chunk build failed ${key}:`, err);
+        manager.setState(key, "generating", "evicted");
+      },
+    );
   };
 
   const deactivate = (key: string): void => {
