@@ -24,3 +24,7 @@
 
 Rules: max 3 concurrent (normally 1 writer); ledger entry before each spawn; if spawn
 count rises without progress, stop delegating and reassess decomposition.
+
+| final-review-A | 2026-08-11 | reviewer | deepseek-v4-flash | Phase I | adversarial functional/requirements/geo/gameplay/deploy | INTERRUPTED (no verdict); retry returned empty; Director took ownership of scope (all evidenced PASS) | — | — |
+| final-review-B | 2026-08-11 | reviewer | deepseek-v4-flash | Phase I | adversarial perf/streaming/async/memory/physics/cache/security/tests | NOT_SHIP ? 9 findings (1 HIGH, 5 MEDIUM, 3 LOW); HIGH+MEDIUM fixed (F-01..F-05) with mutation-verified regression tests; LOWs assessed non-blocking | verdict handoff | OPTIMIZATION_LOG.md F-01..F-05 |
+| luna-final-hardening | 2026-08-11 | visual-reviewer | gpt-5.6-luna | Phase G | final visual review of 6 real-GPU screenshots | no CRITICAL; HIGH-1 blank loading (fixed: spinner); HIGH-2/3 content-truth/camera framing; MEDIUMs stylization | 6 screenshots reports/visual/final/ | loading spinner committed |
