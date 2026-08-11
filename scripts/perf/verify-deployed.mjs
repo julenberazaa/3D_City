@@ -30,7 +30,7 @@ async function main() {
     }
     return out;
   });
-  check("2 js/css assets 200", assets.every((a) => a.endsWith(" 200")), assets.join("; "));
+  check("2 js/css assets present and 200", assets.length > 0 && assets.every((a) => a.endsWith(" 200")), assets.join("; ") || "no assets found");
 
   const searchVisible = await page.locator("#place-input").isVisible().catch(() => false);
   check("3 search UI visible", searchVisible);
