@@ -1,0 +1,98 @@
+{
+  "scenario": "mountain",
+  "label": "Zermatt (mountainous)",
+  "bbox": "7.73,45.99,7.78,46.03",
+  "wallLoadMs": 205855,
+  "result": {
+    "startedAt": "2026-08-11T10:39:31.147Z",
+    "durationSec": 0,
+    "stoppedBy": "time",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (Intel)",
+    "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "hardwareConcurrency": 16,
+    "devicePixelRatio": 1,
+    "finalPixelRatio": 1,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "worldLabel": "live (live)",
+    "worldLoadMs": 24247,
+    "frames": {
+      "count": 29717,
+      "fpsMedian": 163.93,
+      "fpsMin": 2.21,
+      "frameMs": {
+        "p50": 6.1,
+        "p95": 7.4,
+        "p99": 8.1,
+        "max": 451.7
+      },
+      "longFrames50ms": 3,
+      "severeStalls250ms": 1,
+      "stallTimesMs": [
+        452
+      ]
+    },
+    "distance": {
+      "totalM": 566,
+      "maxSpeedKmh": 42.6,
+      "avgSpeedKmh": 11.4
+    },
+    "render": {
+      "drawCalls": {
+        "p50": 24,
+        "p95": 28
+      },
+      "triangles": {
+        "p50": 18236,
+        "p95": 21635
+      },
+      "geometries": 52,
+      "textures": 0
+    },
+    "stream": {
+      "activeMax": 14,
+      "queuedMax": 0,
+      "fetchingMax": 0,
+      "generatingMax": 0,
+      "cancelled": 0,
+      "activated": 14,
+      "evicted": 0,
+      "lateChunks": 1,
+      "genMs": {
+        "p50": 14.5,
+        "p95": 61.7,
+        "max": 61.7,
+        "count": 14
+      }
+    },
+    "autopilot": {
+      "recoveries": 3,
+      "maxStallSec": 3,
+      "relocations": 0
+    },
+    "physics": {
+      "chunksMax": 2,
+      "buildingsMax": 102
+    },
+    "cache": {
+      "hits": 0,
+      "misses": 96,
+      "evicted": 0,
+      "hitRate": 0
+    },
+    "heap": {
+      "usedMBMax": 41.87,
+      "usedMBFinal": 25.79,
+      "samples": 179
+    },
+    "errors": {
+      "count": 0,
+      "messages": []
+    }
+  }
+}

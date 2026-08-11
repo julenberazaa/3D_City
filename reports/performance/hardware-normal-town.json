@@ -1,0 +1,101 @@
+{
+  "scenario": "normal-town",
+  "label": "Zurich (normal town)",
+  "bbox": "8.49,47.34,8.55,47.39",
+  "wallLoadMs": 229310,
+  "result": {
+    "startedAt": "2026-08-11T10:35:57.713Z",
+    "durationSec": 0,
+    "stoppedBy": "time",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (Intel)",
+    "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "hardwareConcurrency": 16,
+    "devicePixelRatio": 1,
+    "finalPixelRatio": 1,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "worldLabel": "live (live)",
+    "worldLoadMs": 40795,
+    "frames": {
+      "count": 27423,
+      "fpsMedian": 161.29,
+      "fpsMin": 0.52,
+      "frameMs": {
+        "p50": 6.2,
+        "p95": 8.9,
+        "p99": 15.9,
+        "max": 1921.5
+      },
+      "longFrames50ms": 16,
+      "severeStalls250ms": 4,
+      "stallTimesMs": [
+        1684,
+        252,
+        1903,
+        1922
+      ]
+    },
+    "distance": {
+      "totalM": 973,
+      "maxSpeedKmh": 44.5,
+      "avgSpeedKmh": 9.8
+    },
+    "render": {
+      "drawCalls": {
+        "p50": 31,
+        "p95": 40
+      },
+      "triangles": {
+        "p50": 114817,
+        "p95": 169405
+      },
+      "geometries": 52,
+      "textures": 0
+    },
+    "stream": {
+      "activeMax": 13,
+      "queuedMax": 0,
+      "fetchingMax": 0,
+      "generatingMax": 0,
+      "cancelled": 0,
+      "activated": 14,
+      "evicted": 1,
+      "lateChunks": 1,
+      "genMs": {
+        "p50": 87.6,
+        "p95": 430.7,
+        "max": 430.7,
+        "count": 14
+      }
+    },
+    "autopilot": {
+      "recoveries": 7,
+      "maxStallSec": 3,
+      "relocations": 3
+    },
+    "physics": {
+      "chunksMax": 3,
+      "buildingsMax": 1689
+    },
+    "cache": {
+      "hits": 0,
+      "misses": 105,
+      "evicted": 0,
+      "hitRate": 0
+    },
+    "heap": {
+      "usedMBMax": 111.94,
+      "usedMBFinal": 54.58,
+      "samples": 183
+    },
+    "errors": {
+      "count": 0,
+      "messages": []
+    }
+  }
+}

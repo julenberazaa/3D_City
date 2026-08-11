@@ -26,5 +26,5 @@ export function hashChunkKey(key: string): string {
 }
 
 export const RELEASE = SOURCE_RELEASE;
-export const GEN_VERSION = "g1";
+export const GEN_VERSION = "g2";
 export const ART_VERSION = "a1";

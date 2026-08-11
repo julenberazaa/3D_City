@@ -1,0 +1,98 @@
+{
+  "scenario": "fixture=sf-downtown",
+  "label": "fixture sf-downtown",
+  "wallLoadMs": 62714,
+  "result": {
+    "startedAt": "2026-08-11T10:46:52.951Z",
+    "durationSec": 61,
+    "stoppedBy": "time",
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (Intel)",
+    "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "hardwareConcurrency": 16,
+    "devicePixelRatio": 1,
+    "finalPixelRatio": 1,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "worldLabel": "sf-downtown (fixture)",
+    "worldLoadMs": 995,
+    "frames": {
+      "count": 9861,
+      "fpsMedian": 163.93,
+      "fpsMin": 1.31,
+      "frameMs": {
+        "p50": 6.1,
+        "p95": 7.3,
+        "p99": 8.1,
+        "max": 762.6
+      },
+      "longFrames50ms": 4,
+      "severeStalls250ms": 2,
+      "stallTimesMs": [
+        763,
+        274
+      ]
+    },
+    "distance": {
+      "totalM": 476,
+      "maxSpeedKmh": 32.4,
+      "avgSpeedKmh": 7.1
+    },
+    "render": {
+      "drawCalls": {
+        "p50": 29,
+        "p95": 32
+      },
+      "triangles": {
+        "p50": 223793,
+        "p95": 285729
+      },
+      "geometries": 46,
+      "textures": 0
+    },
+    "stream": {
+      "activeMax": 14,
+      "queuedMax": 0,
+      "fetchingMax": 0,
+      "generatingMax": 0,
+      "cancelled": 0,
+      "activated": 14,
+      "evicted": 0,
+      "lateChunks": 1,
+      "genMs": {
+        "p50": 44.1,
+        "p95": 197.8,
+        "max": 197.8,
+        "count": 14
+      }
+    },
+    "autopilot": {
+      "recoveries": 4,
+      "maxStallSec": 3,
+      "relocations": 1
+    },
+    "physics": {
+      "chunksMax": 4,
+      "buildingsMax": 3184
+    },
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "evicted": 0,
+      "hitRate": null
+    },
+    "heap": {
+      "usedMBMax": 106.29,
+      "usedMBFinal": 68.7,
+      "samples": 60
+    },
+    "errors": {
+      "count": 0,
+      "messages": []
+    }
+  }
+}

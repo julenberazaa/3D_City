@@ -196,6 +196,50 @@ describe("vehicle", () => {
     return findSpawnPoint(fixture.roads, fixture.terrain, fixture);
   }
 
+  it("findSpawnPoint(near) returns a valid point closer to the requested location", () => {
+    const base = findSpawnPoint(fixture.roads, fixture.terrain, fixture);
+    const near = { x: base.x + 120, z: base.z + 120 };
+    const r = findSpawnPoint(fixture.roads, fixture.terrain, fixture, near);
+    const dNear = Math.hypot(r.x - near.x, r.z - near.z);
+    const dBase = Math.hypot(base.x - near.x, base.z - near.z);
+    expect(dNear).toBeLessThan(dBase);
+    expect(Number.isFinite(r.y)).toBe(true);
+    expect(Number.isFinite(r.heading)).toBe(true);
+  });
+
+  it("vehicle.reset teleports the car to a new spawn and zeroes velocity", () => {
+    const pw = createPhysicsWorld(fixture);
+    pw.world.step();
+    const s = spawnPoint();
+    const car = createCar(pw.world, s);
+    car.setThrottle(1);
+    for (let i = 0; i < 180; i++) {
+      car.update(1 / 60);
+      pw.world.step();
+    }
+    expect(car.speedKmh()).toBeGreaterThan(1);
+    const target = findSpawnPoint(fixture.roads, fixture.terrain, fixture, { x: s.x + 120, z: s.z + 120 });
+    car.reset(target);
+    const p0 = car.position();
+    expect(Math.abs(p0.x - target.x)).toBeLessThan(0.3);
+    expect(Math.abs(p0.z - target.z)).toBeLessThan(0.3);
+    const h0 = car.headingRad();
+    const dHead0 = Math.abs(h0 - target.heading);
+    expect(Math.min(dHead0, 2 * Math.PI - dHead0)).toBeLessThan(0.1);
+    car.setThrottle(0);
+    car.setSteer(0);
+    for (let i = 0; i < 180; i++) {
+      car.update(1 / 60);
+      pw.world.step();
+    }
+    // Bounded post-reset state: no runaway motion (stale wheel/controller
+    // state would push the car; a mild slope may cause slow drift).
+    expect(car.wheelsInContact()).toBeGreaterThanOrEqual(2);
+    expect(car.speedKmh()).toBeLessThan(8);
+    const pEnd = car.position();
+    expect(Math.hypot(pEnd.x - target.x, pEnd.z - target.z)).toBeLessThan(10);
+  });
+
   it("calibration: throttle forward drives along heading, wheels stay in contact, no NaN", () => {
     const pw = createPhysicsWorld(fixture);
     pw.world.step();

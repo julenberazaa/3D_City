@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { ChunkManager, chunkCenter, DEFAULT_STREAM_CONFIG, type ChunkState, type PlayerState } from "./chunkManager";
 import { tileSizeMeters } from "../geo/projection";
 import type { WorldFixture } from "../world/generator";
-import { buildChunkGroup, type WorldProvenance } from "../world/generator";
+import { buildChunkPieces, type ChunkBuildResult, type WorldProvenance } from "../world/generator";
 import { createPhysicsChunk, removePhysicsChunk, type PhysicsChunkHandle, type PhysicsWorld } from "../physics/world";
 
 export interface StreamerHandle {
@@ -16,6 +16,7 @@ export interface StreamerHandle {
   physicsStats(): { chunks: number; buildings: number };
   dispose(): void;
   onChunkActivated?: (key: string) => void;
+  onChunkBuilt?: (key: string, ms: number) => void;
 }
 
 /**
@@ -27,37 +28,89 @@ export function createStreamer(scene: THREE.Scene, physics: PhysicsWorld, fixtur
   const groups = new Map<string, THREE.Group>();
   const physicsHandles = new Map<string, PhysicsChunkHandle>();
   const physicsBuildings = new Map<string, number>();
+  const pendingBuilds = new Map<string, { cancelled: boolean; t0: number }>();
   const counts = new Map<string, { buildings: number; roads: number; waterPolys: number; landcover: number }>();
   const provenance = new Map<string, WorldProvenance>();
   const activeCounts = { buildings: 0, roads: 0, waterPolys: 0, landcover: 0 };
   const activeProvenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
+
+  const nextFrame = (): Promise<void> =>
+    new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+  /**
+   * Async batched chunk build: steps the buildChunkPieces generator, yielding
+   * to the event loop (rAF) so a dense chunk never stalls the main thread for
+   * more than ~1 frame of work at a time. Cancellation discards partial work.
+   */
+  async function buildChunkAsync(
+    key: string,
+    pending: { cancelled: boolean; t0: number },
+  ): Promise<ChunkBuildResult | null> {
+    const [x, y] = key.split("/").map(Number);
+    const it = buildChunkPieces(fixture, 15, x, y);
+    const budgetMs = 14;
+    let batchStart = performance.now();
+    let step = it.next();
+    while (!step.done) {
+      if (pending.cancelled) {
+        it.return(null as never);
+        return null;
+      }
+      if (performance.now() - batchStart > budgetMs) {
+        await nextFrame();
+        if (pending.cancelled) {
+          it.return(null as never);
+          return null;
+        }
+        batchStart = performance.now();
+      }
+      step = it.next();
+    }
+    return step.value;
+  }
 
   const activate = (key: string): void => {
     if (groups.has(key)) {
       manager.setState(key, "generating", "active");
       return;
     }
-    const [x, y] = key.split("/").map(Number);
-    const built = buildChunkGroup(fixture, 15, x, y);
-    groups.set(key, built.group);
-    counts.set(key, built.counts);
-    provenance.set(key, built.provenance);
-    scene.add(built.group);
-    activeCounts.buildings += built.counts.buildings;
-    activeCounts.roads += built.counts.roads;
-    activeCounts.waterPolys += built.counts.waterPolys;
-    activeCounts.landcover += built.counts.landcover;
-    activeProvenance.observed += built.provenance.observed;
-    activeProvenance.derived += built.provenance.derived;
-    activeProvenance.inferred += built.provenance.inferred;
-    manager.setState(key, "generating", "active");
-    handle.onChunkActivated?.(key);
+    if (pendingBuilds.has(key)) return;
+    const pending = { cancelled: false, t0: performance.now() };
+    pendingBuilds.set(key, pending);
+    void buildChunkAsync(key, pending).then((built) => {
+      pendingBuilds.delete(key);
+      if (!built) return;
+      const group = built.group;
+      groups.set(key, group);
+      counts.set(key, built.counts);
+      provenance.set(key, built.provenance);
+      scene.add(group);
+      activeCounts.buildings += built.counts.buildings;
+      activeCounts.roads += built.counts.roads;
+      activeCounts.waterPolys += built.counts.waterPolys;
+      activeCounts.landcover += built.counts.landcover;
+      activeProvenance.observed += built.provenance.observed;
+      activeProvenance.derived += built.provenance.derived;
+      activeProvenance.inferred += built.provenance.inferred;
+      manager.setState(key, "generating", "active");
+      handle.onChunkActivated?.(key);
+      handle.onChunkBuilt?.(key, performance.now() - pending.t0);
+    });
   };
 
   const deactivate = (key: string): void => {
+    const pending = pendingBuilds.get(key);
+    if (pending) {
+      pending.cancelled = true;
+      pendingBuilds.delete(key);
+    }
     const g = groups.get(key);
     if (g) {
       scene.remove(g);
+      g.traverse((o) => {
+        const m = o as { isMesh?: boolean; geometry?: { dispose: () => void; attributes?: Record<string, { array?: unknown }> } };
+        if (m.isMesh && m.geometry) m.geometry.dispose();
+      });
       groups.delete(key);
     }
     const ph = physicsHandles.get(key);
@@ -88,7 +141,7 @@ export function createStreamer(scene: THREE.Scene, physics: PhysicsWorld, fixtur
       const actions = manager.update(player);
       for (const a of actions) {
         if (a.action === "load") {
-          // Fixture-backed provider: generation is synchronous here.
+          // Fixture-backed provider: no real fetch; generation is async-batched.
           if (manager.state(a.key) === "queued") manager.setState(a.key, "queued", "fetching");
           if (manager.state(a.key) === "fetching") manager.setState(a.key, "fetching", "generating");
           activate(a.key);
@@ -133,6 +186,7 @@ export function createStreamer(scene: THREE.Scene, physics: PhysicsWorld, fixtur
     activeProvenance: () => ({ ...activeProvenance }),
     dispose(): void {
       for (const key of [...groups.keys()]) deactivate(key);
+      for (const key of [...pendingBuilds.keys()]) deactivate(key);
     },
   };
   return handle;

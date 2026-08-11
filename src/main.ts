@@ -14,6 +14,7 @@ import { createStreamer } from "./stream/streamer";
 import { z15Grid } from "./data/fixtureBuilder";
 import { buildGazetteerIndex, searchGazetteer, type GazetteerEntry } from "./search/gazetteer";
 import { searchOpenMeteo } from "./search/openMeteo";
+import { startBenchmark, type BenchmarkSession } from "./bench/benchmark";
 
 export const DEMO_BBOX = "-122.425,37.767,-122.396,37.792";
 const MAX_LIVE_CHUNKS = 64;
@@ -170,6 +171,7 @@ async function showSearch(): Promise<void> {
 
 async function boot(): Promise<void> {
   try {
+    const t0 = performance.now();
     await rapierInit();
     const params = new URLSearchParams(window.location.search);
     const bboxParam = params.get("bbox");
@@ -214,9 +216,58 @@ async function boot(): Promise<void> {
     const controls = createControls(root);
     const streamer = createStreamer(render.scene, physics, fixture);
     streamer.onChunkActivated = (key) => {
-      // first activation: snap HUD data
-      void key;
+      bench?.recordActivated(key);
     };
+    streamer.onChunkBuilt = (key, ms) => {
+      bench?.recordGen(key, ms);
+    };
+
+    let bench: BenchmarkSession | null = null;
+    const benchParams = params.get("benchmark");
+    if (benchParams) {
+      const seconds = Number(params.get("bench_seconds") ?? 300);
+      const dist = Number(params.get("bench_dist") ?? 5000);
+      const roadSegs: Array<{ ax: number; az: number; bx: number; bz: number }> = [];
+      for (const c of fixture.roads) {
+        for (const f of c.features) {
+          const line = f.line;
+          if (!line || line.length < 2) continue;
+          for (let i = 0; i < line.length - 1; i++) {
+            roadSegs.push({ ax: line[i]![0], az: line[i]![1], bx: line[i + 1]![0], bz: line[i + 1]![1] });
+          }
+        }
+      }
+      bench = startBenchmark(
+        { seconds: Number.isFinite(seconds) ? seconds : 300, dist: Number.isFinite(dist) ? dist : 5000 },
+        {
+          renderer: render,
+          streamer,
+          car: vehicle,
+          controls,
+          startPos: { x: spawn.x, z: spawn.z },
+          worldLabel: `${fixture.manifest.name} (${sourceLabel})`,
+          worldLoadMs: Math.round(performance.now() - t0),
+          origin: fixture.manifest.origin,
+          roadSegs,
+          relocate: (pos, heading) => {
+            const fx = Math.sin(heading);
+            const fz = Math.cos(heading);
+            const target = findSpawnPoint(fixture.roads, fixture.terrain, fixture, {
+              x: pos.x + fx * 600,
+              z: pos.z + fz * 600,
+            });
+            vehicle.reset(target);
+            latestCarPos.set(target.x, target.y, target.z);
+          },
+        },
+      );
+    }
+    window.addEventListener("error", (e) => {
+      bench?.recordError(`window:${e.message}`);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      bench?.recordError(`unhandledrejection:${String(e.reason)}`);
+    });
 
     let followMode = true;
     const latestCarPos = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
@@ -259,6 +310,12 @@ async function boot(): Promise<void> {
         if (followMode) orbit.detach();
         else orbit.attach(render.renderer.domElement);
       }
+      if (e.key.toLowerCase() === "r") {
+        const spawn2 = findSpawnPoint(fixture.roads, fixture.terrain, fixture, latestCarPos);
+        vehicle.reset(spawn2);
+        latestCarPos.set(spawn2.x, spawn2.y, spawn2.z);
+        setStatus("Recovered");
+      }
     });
 
     window.__game = {
@@ -284,11 +341,14 @@ async function boot(): Promise<void> {
     };
 
     let accumulator = 0;
+    let benchElapsed = 0;
     render.startRender(orbit.camera, (dt) => {
+      benchElapsed += dt;
       accumulator = Math.min(accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
       vehicle.setThrottle(controls.throttle);
       vehicle.setSteer(controls.steer);
       vehicle.setBrake(controls.brake);
+      if (bench) bench.tick(dt, benchElapsed);
       const fwd = vehicle.forward();
       streamer.update({
         x: latestCarPos.x,

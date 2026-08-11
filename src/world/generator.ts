@@ -106,6 +106,12 @@ class VertexBuilder {
   private indices: number[] = [];
   private map = new Map<string, number>();
 
+  /** Reset the dedup scope (per-building dedup keeps the map tiny; shared
+   *  vertices across unrelated features are vanishingly rare in real data). */
+  begin(): void {
+    this.map.clear();
+  }
+
   add(x: number, y: number, z: number, r: number, g: number, b: number): number {
     const key = `${x},${y},${z},${r},${g},${b}`;
     const existing = this.map.get(key);
@@ -127,7 +133,12 @@ class VertexBuilder {
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(this.positions, 3));
     geometry.setAttribute("color", new THREE.Float32BufferAttribute(this.colors, 3));
     geometry.setIndex(new THREE.Uint32BufferAttribute(this.indices, 1));
-    geometry.computeVertexNormals();
+    // All materials are flatShaded (face normals via shader derivatives), so
+    // the normal attribute is never sampled for lighting: constant normals
+    // are 10-50x cheaper than computeVertexNormals() over 100k+ vertices.
+    const normals = new Float32Array(this.positions.length);
+    for (let i = 1; i < normals.length; i += 3) normals[i] = 1;
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
     return new THREE.Mesh(geometry, material);
   }
 }
@@ -200,6 +211,24 @@ function distinctPoints(ring: number[][]): number[][] {
   return ring;
 }
 
+/**
+ * Deterministic ring decimation for RENDER paths only: ear-clipping is O(n^2)
+ * and real footprints/rivers can carry thousands of vertices (single-polygon
+ * triangulation then blocks the main thread for ~hundreds of ms). Sampling to
+ * <= maxVerts keeps the silhouette at miniature scale while bounding build
+ * cost. Physics colliders keep the FULL ring (box from bbox, unaffected).
+ */
+function decimateRing(pts: number[][], maxVerts = 64): number[][] {
+  if (pts.length <= maxVerts) return pts;
+  const out: number[][] = [];
+  const span = pts.length - 1;
+  for (let i = 0; i < maxVerts; i++) {
+    const idx = Math.round((i * span) / (maxVerts - 1));
+    out.push(pts[idx]);
+  }
+  return out;
+}
+
 function ringArea(pts: number[][]): number {
   let a = 0;
   for (let i = 0; i < pts.length; i++) {
@@ -269,7 +298,7 @@ function buildWaterChunkMesh(c: ChunkRecord): { mesh: THREE.Mesh | null; count: 
   let count = 0;
   for (const f of c.features) {
     if (!f.ring) continue;
-    const pts = distinctPoints(f.ring);
+    const pts = decimateRing(distinctPoints(f.ring));
     if (pts.length < 3 || ringArea(pts) < 0.5) continue;
     const faces = triangulate(pts);
     const base = fnv1a(f.id) % 5;
@@ -297,7 +326,7 @@ function buildLandcoverChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mes
   let count = 0;
   for (const f of c.features) {
     if (!f.ring) continue;
-    const pts = distinctPoints(f.ring);
+    const pts = decimateRing(distinctPoints(f.ring));
     if (pts.length < 3 || ringArea(pts) < 0.5) continue;
     const [cx, cy] = centroid(pts);
     const y = sampleTerrain(terrain, cx, cy) + 0.05;
@@ -428,7 +457,7 @@ export function resolveBuilding(f: FixtureFeature, parts: Map<string, FixtureFea
   return { id: f.id, ring, height: Math.max(3, height), roof, provenance };
 }
 
-function buildBuildingChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh: THREE.Mesh | null; count: number; provenance: WorldProvenance } {
+function* buildBuildingChunkPieces(c: ChunkRecord, terrain: ChunkTerrain[]): Generator<void, { mesh: THREE.Mesh | null; count: number; provenance: WorldProvenance }, void> {
   const vb = new VertexBuilder();
   const parts = new Map<string, FixtureFeature[]>();
   const parents: FixtureFeature[] = [];
@@ -442,11 +471,14 @@ function buildBuildingChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh
     }
   }
   let count = 0;
+  let processed = 0;
   const provenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
   for (const f of parents) {
     const built = resolveBuilding(f, parts);
     if (!built) continue;
-    const { ring, height, roof } = built;
+    const ring = decimateRing(built.ring);
+    const { height, roof } = built;
+    vb.begin();
     const [cx, cy] = centroid(ring);
     const baseY = sampleTerrain(terrain, cx, cy) - 0.15;
     const wallTop = baseY + height;
@@ -491,6 +523,7 @@ function buildBuildingChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mesh
     }
     count++;
     provenance[built.provenance]++;
+    if (++processed % 120 === 0) yield;
   }
   return { mesh: vb.toMesh(BUILDING_MATERIAL), count, provenance };
 }
@@ -509,6 +542,18 @@ export interface ChunkBuildResult {
 
 /** Build the render group for ONE z15 chunk (terrain+roads+water+landcover+buildings). */
 export function buildChunkGroup(fixture: WorldFixture, z: number, x: number, y: number): ChunkBuildResult {
+  const it = buildChunkPieces(fixture, z, x, y);
+  let step = it.next();
+  while (!step.done) step = it.next();
+  return step.value;
+}
+
+/**
+ * Same as buildChunkGroup but as a generator: yields control points between
+ * work batches so an async host can interleave chunk generation with rendering
+ * (no >1-frame main-thread stalls) while keeping byte-deterministic output.
+ */
+export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y: number): Generator<void, ChunkBuildResult, void> {
   void z;
   const group = new THREE.Group();
   const counts = { buildings: 0, roads: 0, waterPolys: 0, landcover: 0 };
@@ -518,6 +563,7 @@ export function buildChunkGroup(fixture: WorldFixture, z: number, x: number, y: 
   if (terrain) {
     const mesh = buildTerrainChunkMesh(terrain);
     if (mesh) group.add(mesh);
+    yield;
   }
   const addChunk = <T extends { z: number; x: number; y: number }>(
     records: T[],
@@ -531,18 +577,28 @@ export function buildChunkGroup(fixture: WorldFixture, z: number, x: number, y: 
     if (mesh) group.add(mesh);
   };
   addChunk(fixture.roads, (c) => buildRoadChunkMesh(c, fixture.terrain), "roads");
+  yield;
   addChunk(fixture.water, (c) => buildWaterChunkMesh(c), "waterPolys");
+  yield;
   addChunk(fixture.landcover, (c) => buildLandcoverChunkMesh(c, fixture.terrain), "landcover");
+  yield;
 
   const bRec = fixture.buildings.find((c) => c.x === x && c.y === y);
   if (bRec) {
-    const { mesh, count, provenance: p } = buildBuildingChunkMesh(bRec, fixture.terrain);
+    const pieces = buildBuildingChunkPieces(bRec, fixture.terrain);
+    let step = pieces.next();
+    while (!step.done) {
+      yield;
+      step = pieces.next();
+    }
+    const { mesh, count, provenance: p } = step.value;
     counts.buildings += count;
     provenance.observed += p.observed;
     provenance.derived += p.derived;
     provenance.inferred += p.inferred;
     if (mesh) group.add(mesh);
   }
+  yield;
   return { group, counts, provenance };
 }
 
@@ -594,7 +650,10 @@ export function buildWorld(fixture: WorldFixture): WorldModel {
     }
   }
   for (const c of fixture.buildings) {
-    const { mesh, count, provenance: p } = buildBuildingChunkMesh(c, fixture.terrain);
+    const pieces = buildBuildingChunkPieces(c, fixture.terrain);
+    let step = pieces.next();
+    while (!step.done) step = pieces.next();
+    const { mesh, count, provenance: p } = step.value;
     counts.buildings += count;
     provenance.observed += p.observed;
     provenance.derived += p.derived;

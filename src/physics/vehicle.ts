@@ -39,6 +39,38 @@ export interface Car {
   headingRad(): number;
   forward(): { x: number; z: number };
   transform(): VehicleTransform;
+  reset(spawn: CarSpawn): void;
+}
+
+/**
+ * Build the raycast vehicle controller on a chassis body: wheels + suspension.
+ * Reused by createCar and by reset() (recreating the controller clears any
+ * stale wheel rotation/suspension state after a teleport).
+ */
+function buildController(world: RapierWorld, body: RigidBody): DynamicRayCastVehicleController {
+  const controller = world.createVehicleController(body);
+  controller.indexUpAxis = 1;
+  controller.setIndexForwardAxis = 2;
+
+  for (const [x, y, z] of WHEEL_POS) {
+    controller.addWheel(
+      { x, y, z } as Vector3,
+      { x: 0, y: -1, z: 0 } as Vector3,
+      { x: 1, y: 0, z: 0 } as Vector3,
+      0.45,
+      0.4,
+    );
+  }
+  const n = controller.numWheels();
+  for (let i = 0; i < n; i++) {
+    controller.setWheelSuspensionStiffness(i, 25);
+    controller.setWheelSuspensionCompression(i, 4.4);
+    controller.setWheelSuspensionRelaxation(i, 2.2);
+    controller.setWheelFrictionSlip(i, 2.6);
+    controller.setWheelMaxSuspensionTravel(i, 0.3);
+    controller.setWheelMaxSuspensionForce(i, 40000);
+  }
+  return controller;
 }
 
 const WHEEL_POS: Array<[number, number, number]> = [
@@ -75,35 +107,16 @@ export function createCar(world: RapierWorld, spawn: CarSpawn): Car {
   chassis.setDensity(159);
   world.createCollider(chassis, body);
 
-  const vehicle = world.createVehicleController(body);
-  vehicle.indexUpAxis = 1;
-  vehicle.setIndexForwardAxis = 2;
-
-  for (const [x, y, z] of WHEEL_POS) {
-    vehicle.addWheel(
-      { x, y, z } as Vector3,
-      { x: 0, y: -1, z: 0 } as Vector3,
-      { x: 1, y: 0, z: 0 } as Vector3,
-      0.45,
-      0.4,
-    );
-  }
-  const n = vehicle.numWheels();
-  for (let i = 0; i < n; i++) {
-    vehicle.setWheelSuspensionStiffness(i, 25);
-    vehicle.setWheelSuspensionCompression(i, 4.4);
-    vehicle.setWheelSuspensionRelaxation(i, 2.2);
-    vehicle.setWheelFrictionSlip(i, 2.6);
-    vehicle.setWheelMaxSuspensionTravel(i, 0.3);
-    vehicle.setWheelMaxSuspensionForce(i, 40000);
-  }
+  let vehicle = buildController(world, body);
 
   let throttle = 0;
   let steer = 0;
   let brake = 0;
 
   return {
-    vehicle,
+    get vehicle() {
+      return vehicle;
+    },
     body,
     setThrottle(t) {
       throttle = Math.max(-1, Math.min(1, t));
@@ -115,6 +128,7 @@ export function createCar(world: RapierWorld, spawn: CarSpawn): Car {
       brake = Math.max(0, Math.min(1, b));
     },
     update(dt) {
+      const n = vehicle.numWheels();
       for (let i = 0; i < n; i++) {
         vehicle.setWheelBrake(i, brake * 40);
         vehicle.setWheelSteering(i, FRONT_WHEELS.includes(i) ? steer * 0.55 : 0);
@@ -128,6 +142,7 @@ export function createCar(world: RapierWorld, spawn: CarSpawn): Car {
       return Math.abs(vehicle.currentVehicleSpeed()) * 3.6;
     },
     wheelsInContact() {
+      const n = vehicle.numWheels();
       let count = 0;
       for (let i = 0; i < n; i++) if (vehicle.wheelIsInContact(i)) count++;
       return count;
@@ -148,6 +163,19 @@ export function createCar(world: RapierWorld, spawn: CarSpawn): Car {
       const t = body.translation();
       const q = body.rotation();
       return { position: { x: t.x, y: t.y, z: t.z }, rotation: { x: q.x, y: q.y, z: q.z, w: q.w } };
+    },
+    reset(spawn) {
+      body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true);
+      body.setRotation(quatFromHeading(spawn.heading), true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      // Recreate the controller: teleporting a raycast vehicle leaves stale
+      // wheel rotation/suspension state that pushes the car long after a reset.
+      world.removeVehicleController(vehicle);
+      vehicle = buildController(world, body);
+      throttle = 0;
+      steer = 0;
+      brake = 0;
     },
   };
 }

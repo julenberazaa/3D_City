@@ -100,5 +100,23 @@ test("game boots and the car drives through the world", async ({ page }) => {
   });
   expect(after).toBeGreaterThan(0);
 
+  // R = vehicle recovery: teleports the car to a nearby safe road point and
+  // clears all motion (stale wheel state would keep pushing the car).
+  const beforeRecovery = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { carPos: () => { x: number; y: number; z: number } } }).__game;
+    return g.carPos();
+  });
+  await page.keyboard.press("KeyR");
+  await page.waitForTimeout(1500);
+  const recovered = await page.evaluate(() => {
+    const g = (window as unknown as { __game: { carPos: () => { x: number; y: number; z: number }; speedKmh: () => number; groundHeight: () => number; wheels: () => number } }).__game;
+    return { pos: g.carPos(), speed: g.speedKmh(), ground: g.groundHeight(), wheels: g.wheels() };
+  });
+  // Car is on the ground at the recovery point, close to its previous spot.
+  expect(recovered.wheels).toBeGreaterThanOrEqual(2);
+  expect(Math.abs(recovered.pos.y - recovered.ground)).toBeLessThan(6);
+  expect(recovered.speed).toBeLessThan(20);
+  expect(Math.hypot(recovered.pos.x - beforeRecovery.x, recovered.pos.z - beforeRecovery.z)).toBeLessThan(800);
+
   await page.screenshot({ path: "reports/visual/wp03-drive.png" });
 });

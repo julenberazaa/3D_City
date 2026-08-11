@@ -72,6 +72,7 @@ export function findSpawnPoint(
   roads: ChunkRecord[],
   terrain: ChunkTerrain[],
   fixture?: WorldFixture,
+  near?: { x: number; z: number },
 ): CarSpawnPoint {
   const aabbs = fixture ? buildingAabbs(fixture) : [];
   const margin = 3;
@@ -110,6 +111,8 @@ export function findSpawnPoint(
   };
 
   const candidates: Array<{ x: number; z: number; heading: number; dist: number }> = [];
+  const originX = near?.x ?? 0;
+  const originZ = near?.z ?? 0;
   for (const c of roads) {
     for (const f of c.features) {
       const line = f.line;
@@ -119,7 +122,7 @@ export function findSpawnPoint(
         x: ax,
         z: az,
         heading: Math.atan2(line[1][0] - ax, line[1][1] - az),
-        dist: Math.hypot(ax, az),
+        dist: Math.hypot(ax - originX, az - originZ),
       });
     }
   }
@@ -238,7 +241,7 @@ function buildingBoxFor(
   const b = body ?? world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, baseY + hy, cz));
   b.setTranslation({ x: cx, y: baseY + hy, z: cz }, true);
   const desc = descFactory.cuboid(hx, hy, hz);
-  desc.setFriction(1.0);
+  desc.setFriction(0.35);
   desc.setRestitution(0.0);
   return world.createCollider(desc, b);
 }
