@@ -63,6 +63,7 @@ const hudEl = document.getElementById("hud")!;
 function setStatus(text: string, isError = false): void {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
+  statusEl.classList.toggle("loading", !isError && text.length > 0);
   statusEl.setAttribute("role", isError ? "alert" : "status");
   statusEl.setAttribute("aria-live", isError ? "assertive" : "polite");
 }
