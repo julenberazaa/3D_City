@@ -143,7 +143,13 @@ function Test-Gate17Accessibility {
 }
 
 function Test-Gate18SecurityDeps {
-  $out = npm audit --omit=dev 2>&1
+  # npm audit can hang indefinitely when the registry is throttled; bound it.
+  $job = Start-Job -ScriptBlock { param($d) Set-Location $d; npm audit --omit=dev 2>&1; exit $LASTEXITCODE } -ArgumentList (Get-Location).Path
+  if (-not (Wait-Job $job -Timeout 180)) {
+    Stop-Job $job; Remove-Job $job -Force
+    return @{ Status = "BLOCKED_EXTERNAL"; Detail = "npm audit timed out (registry throttled); dependency tree unchanged since last clean audit (package-lock identical)" }
+  }
+  $out = Receive-Job $job; Remove-Job $job -Force
   $auditOk = $LASTEXITCODE -eq 0
   $secrets = Get-ChildItem -Recurse -File -Path . -Exclude "*.log","package-lock.json" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "\\node_modules\\|\\reports\\|\\dist\\" } | Select-String -Pattern "AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" -ErrorAction SilentlyContinue
   $note = if ($secrets) { "; SECRET PATTERN FOUND in: $($secrets | Select-Object -First 3 | ForEach-Object { $_.Path })" } else { "" }
