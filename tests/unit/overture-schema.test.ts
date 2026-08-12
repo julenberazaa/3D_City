@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PMTiles } from "pmtiles";
 import { decodeTile } from "../../src/geo/mvt";
-import { webMercatorX, webMercatorY } from "../../src/geo/projection";
 
 const RELEASE = "2026-07-22.0";
 const BASE = `https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/${RELEASE}`;
@@ -47,6 +46,7 @@ describe("scratch: real Overture tile schemas (pinned release)", () => {
     const t = zxy(-74.015, 40.7, -73.96, 40.735, 14);
     const srcB = new PMTiles(`${BASE}/buildings.pmtiles`);
     const resB = await srcB.getZxy(t.z, t.x, t.y);
+    if (!resB) throw new Error("Manhattan z14 building tile missing");
     const tileB = decodeTile(new Uint8Array(resB.data));
     const bld = tileB.layers.get("building")!;
     const pct = (n: number, total: number) => `${Math.round((n / total) * 100)}% (${n}/${total})`;
@@ -71,6 +71,7 @@ describe("scratch: real Overture tile schemas (pinned release)", () => {
 
     const srcT = new PMTiles(`${BASE}/transportation.pmtiles`);
     const resT = await srcT.getZxy(t.z, t.x, t.y);
+    if (!resT) throw new Error("Manhattan z14 transportation tile missing");
     const tileT = decodeTile(new Uint8Array(resT.data));
     const seg = tileT.layers.get("segment")!;
     const cls = new Map<string, number>();

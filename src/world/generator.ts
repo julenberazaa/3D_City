@@ -183,6 +183,100 @@ const FACADE_PALETTE: number[][] = [
   [0.8, 0.68, 0.52],
 ];
 
+/** OBSERVED facade_material / roof_material → color (miniature style, no textures). */
+const MATERIAL_COLORS: Record<string, number[]> = {
+  brick: [0.62, 0.34, 0.24],
+  red_brick: [0.66, 0.33, 0.27],
+  concrete: [0.72, 0.72, 0.7],
+  glass: [0.45, 0.62, 0.7],
+  metal: [0.52, 0.55, 0.58],
+  steel: [0.55, 0.58, 0.6],
+  wood: [0.56, 0.42, 0.28],
+  timber: [0.52, 0.38, 0.24],
+  plaster: [0.82, 0.78, 0.7],
+  stucco: [0.8, 0.75, 0.68],
+  stone: [0.68, 0.66, 0.62],
+  sandstone: [0.74, 0.66, 0.52],
+  limestone: [0.8, 0.77, 0.7],
+  marble: [0.85, 0.84, 0.8],
+  slate: [0.35, 0.36, 0.4],
+  copper: [0.45, 0.55, 0.5],
+  tile: [0.58, 0.4, 0.3],
+  ceramic: [0.75, 0.6, 0.5],
+  zinc: [0.55, 0.58, 0.6],
+  asphalt: [0.35, 0.35, 0.36],
+  tar: [0.3, 0.3, 0.32],
+};
+
+/** DERIVED: Overture building subtype → stylized facade. */
+const SUBTYPE_FACADES: Record<string, number[]> = {
+  residential: [0.76, 0.55, 0.38],
+  apartments: [0.7, 0.52, 0.42],
+  house: [0.8, 0.6, 0.42],
+  commercial: [0.55, 0.62, 0.72],
+  retail: [0.6, 0.55, 0.65],
+  offices: [0.5, 0.58, 0.68],
+  civic: [0.78, 0.72, 0.6],
+  education: [0.72, 0.6, 0.48],
+  religious: [0.42, 0.42, 0.48],
+  transportation: [0.5, 0.55, 0.6],
+  industrial: [0.6, 0.58, 0.56],
+  warehouse: [0.58, 0.56, 0.54],
+  agricultural: [0.55, 0.5, 0.4],
+  outbuilding: [0.62, 0.55, 0.45],
+  entertainment: [0.58, 0.48, 0.62],
+  hospital: [0.66, 0.68, 0.72],
+  hotel: [0.68, 0.6, 0.55],
+};
+
+function hexToRgb(hex: string): number[] | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const v = parseInt(m[1]!, 16);
+  return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff].map((c) => c / 255);
+}
+
+/**
+ * Evidence-hierarchy facade color (OBSERVED hex → OBSERVED material →
+ * DERIVED subtype style → INFERRED deterministic palette).
+ */
+export function facadeColorOf(f: FixtureFeature): number[] {
+  if (f.facadeColor) {
+    const hex = hexToRgb(f.facadeColor);
+    if (hex) return hex;
+  }
+  if (f.facadeMaterial) {
+    const mat = MATERIAL_COLORS[f.facadeMaterial.toLowerCase()];
+    if (mat) return mat;
+  }
+  if (f.subtype) {
+    const st = SUBTYPE_FACADES[f.subtype.toLowerCase()];
+    if (st) return st;
+  }
+  return FACADE_PALETTE[fnv1a(f.id) % FACADE_PALETTE.length]!;
+}
+
+/** Evidence-hierarchy roof color (OBSERVED hex → OBSERVED material → facade-derived). */
+export function roofColorOf(f: FixtureFeature, facade: number[]): number[] {
+  if (f.roofColor) {
+    const hex = hexToRgb(f.roofColor);
+    if (hex) return hex;
+  }
+  if (f.roofMaterial) {
+    const mat = MATERIAL_COLORS[f.roofMaterial.toLowerCase()];
+    if (mat) return mat;
+  }
+  return [facade[0] * 0.82, facade[1] * 0.82, facade[2] * 0.82];
+}
+
+/** Roof apex height: OBSERVED roof_height when present, else stylized fraction. */
+export function roofApexOf(f: FixtureFeature, height: number): number {
+  if (f.roofHeight !== undefined && Number.isFinite(f.roofHeight)) {
+    return Math.min(8, Math.max(0.6, f.roofHeight));
+  }
+  return Math.min(4, height * 0.25);
+}
+
 const chunkKey = (z: number, x: number, y: number): ChunkKey => `${z}-${x}-${y}`;
 
 /** Bilinear terrain height at fixture-local (x, y); grid rows run north (originY) to south. */
@@ -467,6 +561,7 @@ interface BuildingParts {
 
 export interface ResolvedBuilding extends BuildingParts {
   id: string;
+  levels?: number;
 }
 
 /** Effective footprint+height for a building parent (parts override parents). Shared with physics. */
@@ -498,7 +593,7 @@ export function resolveBuilding(f: FixtureFeature, parts: Map<string, FixtureFea
     height = 8 + (fnv1a(f.id) % 7);
     provenance = "inferred";
   }
-  return { id: f.id, ring, height: Math.max(3, height), roof, provenance };
+  return { id: f.id, ring, height: Math.max(3, height), roof, levels, provenance };
 }
 
 function* buildBuildingChunkPieces(c: ChunkRecord, terrain: ChunkTerrain[]): Generator<void, { mesh: THREE.Mesh | null; count: number; provenance: WorldProvenance }, void> {
@@ -523,15 +618,25 @@ function* buildBuildingChunkPieces(c: ChunkRecord, terrain: ChunkTerrain[]): Gen
     const ring = decimateRing(built.ring);
     const { height, roof } = built;
     vb.begin();
-    const [cx, cy] = centroid(ring);
-    const baseY = sampleTerrain(terrain, cx, cy) - 0.15;
-    const wallTop = baseY + height;
-    const paletteIdx = fnv1a(f.id) % FACADE_PALETTE.length;
-    const facade = FACADE_PALETTE[paletteIdx];
-    const roofCol = [facade[0] * 0.8, facade[1] * 0.8, facade[2] * 0.8];
+    const [cx, cz] = centroid(ring);
+    // Terrain-hugging base: each ring vertex sits on its own terrain height
+    // (sloped skirt), while the roof stays flat at maxBase + height. Physics
+    // uses the same max-base policy (box), so colliders never hang in air.
+    let maxBase = -Infinity;
+    const baseYAt: number[] = [];
+    for (const p of ring) {
+      const t = sampleTerrain(terrain, p[0], p[1]) - 0.15;
+      baseYAt.push(t);
+      maxBase = Math.max(maxBase, t);
+    }
+    const wallTop = maxBase + height;
+    const facade = facadeColorOf(f);
+    const roofCol = roofColorOf(f, facade);
     const groundCol = [facade[0] * 0.7, facade[1] * 0.7, facade[2] * 0.7];
     const faces = triangulate(ring);
     const gabled = roof === "gabled" || roof === "hipped";
+    const pyramidal = roof === "pyramidal" || roof === "pyramid";
+    const apex = roofApexOf(f, height);
     const minX = Math.min(...ring.map((p) => p[0]));
     const maxX = Math.max(...ring.map((p) => p[0]));
     const minZ = Math.min(...ring.map((p) => p[1]));
@@ -539,8 +644,11 @@ function* buildBuildingChunkPieces(c: ChunkRecord, terrain: ChunkTerrain[]): Gen
     const extentX = maxX - minX;
     const extentZ = maxZ - minZ;
     const ridgeX = extentX >= extentZ;
-    const apex = Math.min(4, height * 0.25);
     const roofYAt = (p: number[]): number => {
+      if (pyramidal) {
+        const t = Math.max(Math.abs(p[0] - cx) / Math.max(1e-9, extentX / 2), Math.abs(p[1] - cz) / Math.max(1e-9, extentZ / 2));
+        return wallTop + apex * (1 - Math.min(1, t));
+      }
       if (!gabled) return wallTop;
       const t = ridgeX ? (p[0] - minX) / Math.max(1e-9, extentX) : (p[1] - minZ) / Math.max(1e-9, extentZ);
       return wallTop + 2 * apex * Math.min(t, 1 - t);
@@ -548,18 +656,46 @@ function* buildBuildingChunkPieces(c: ChunkRecord, terrain: ChunkTerrain[]): Gen
     const capVerts: number[] = ring.map((p) =>
       vb.add(p[0], roofYAt(p), p[1], roofCol[0], roofCol[1], roofCol[2]),
     );
-    const groundVerts: number[] = ring.map((p) => vb.add(p[0], baseY, p[1], groundCol[0], groundCol[1], groundCol[2]));
-    const wallTopVerts: number[] = ring.map((p) =>
-      vb.add(p[0], wallTop, p[1], facade[0], facade[1], facade[2]),
-    );
+    const groundVerts: number[] = ring.map((p, i) => vb.add(p[0], baseYAt[i]!, p[1], groundCol[0], groundCol[1], groundCol[2]));
+    // Facade rhythm: few horizontal bands (miniature floors) when levels are
+    // known — bounded (≤4 bands) so tall buildings stay cheap.
+    const bands = built.levels !== undefined && Number.isFinite(built.levels) && built.levels > 1 ? Math.min(4, Math.max(2, Math.round(built.levels / 4))) : 1;
+    const bandTops: number[][] = [];
+    for (let b = 0; b < bands; b++) {
+      const shade = 1 - 0.1 * (b % 2);
+      bandTops.push(
+        ring.map((p, i) =>
+          vb.add(p[0], baseYAt[i]! + (height * (b + 1)) / bands, p[1], facade[0] * shade, facade[1] * shade, facade[2] * shade),
+        ),
+      );
+    }
     for (const [a, b2, c2] of faces) {
       vb.tri(capVerts[a], capVerts[b2], capVerts[c2]);
       vb.tri(groundVerts[a], groundVerts[c2], groundVerts[b2]);
     }
+    let prevBand = groundVerts;
+    for (const band of bandTops) {
+      for (let i = 0; i < ring.length; i++) {
+        const j = (i + 1) % ring.length;
+        const a = prevBand[i];
+        const b2 = prevBand[j];
+        const c2 = band[j];
+        const d = band[i];
+        vb.tri(a, c2, b2);
+        vb.tri(a, d, c2);
+      }
+      prevBand = band;
+    }
+    // Flat top edge (roof sits at maxBase + height; sloped bands end lower on
+    // low corners, so close the strip at the true wall top).
+    const topShade = 1 - 0.1 * (bands % 2);
+    const wallTopVerts: number[] = ring.map((p) =>
+      vb.add(p[0], wallTop, p[1], facade[0] * topShade, facade[1] * topShade, facade[2] * topShade),
+    );
     for (let i = 0; i < ring.length; i++) {
       const j = (i + 1) % ring.length;
-      const a = groundVerts[i];
-      const b2 = groundVerts[j];
+      const a = prevBand[i];
+      const b2 = prevBand[j];
       const c2 = wallTopVerts[j];
       const d = wallTopVerts[i];
       vb.tri(a, c2, b2);
