@@ -23,7 +23,9 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    // Heavy generators (full-fixture buildWorld) + rapier stepping can exceed
+    // 30s on loaded machines; 60s keeps gates deterministic under contention.
+    testTimeout: 60000,
+    hookTimeout: 60000,
   },
 });
