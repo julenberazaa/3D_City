@@ -87,29 +87,69 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
     }
   });
 
-  it("ROAD-01 road class distribution is predominantly drivable (not footpaths)", () => {
-    const cls = new Map<string, number>();
-    for (const f of allRoads) cls.set(f.class ?? "?", (cls.get(f.class ?? "?") ?? 0) + 1);
-    const total = allRoads.length;
-    const nonDrivable = ["footway", "path", "steps", "pedestrian", "cycleway", "track"];
-    const share = [...cls.entries()].filter(([k]) => nonDrivable.includes(k)).reduce((s, [, v]) => s + v, 0) / total;
-    console.log("ROAD classes:", [...cls.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(", "));
-    console.log(`non-drivable share: ${(share * 100).toFixed(1)}% (${Math.round(share * total)}/${total})`);
+  it("ROAD-01 rendered road surface is predominantly drivable (not footpaths)", () => {
+    // Measures RIBBON AREA (length x class width) — what actually dominates the
+    // scene — not feature counts. Non-vehicular widths are reduced in the
+    // generator, so a data-heavy footway network must not dominate visually.
+    const WIDTHS: Record<string, number> = {
+      motorway: 7.5, trunk: 6.5, primary: 9, secondary: 7.5, tertiary: 6,
+      residential: 5, service: 4, living_street: 4.5, unclassified: 4,
+      pedestrian: 3, footway: 1.8, path: 1.4, steps: 1.8, cycleway: 1.8,
+    };
+    const nonVehicular = new Set(["footway", "path", "steps", "pedestrian", "cycleway", "track"]);
+    let vehicularArea = 0;
+    let nonArea = 0;
+    for (const f of allRoads) {
+      const line = f.line ?? [];
+      let len = 0;
+      for (let i = 0; i < line.length - 1; i++) {
+        len += Math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]);
+      }
+      const w = WIDTHS[f.class ?? ""] ?? 4;
+      if (nonVehicular.has(f.class ?? "")) nonArea += len * w;
+      else vehicularArea += len * w;
+    }
+    const total = vehicularArea + nonArea;
+    const share = nonArea / Math.max(1, total);
+    console.log(`ribbon area: vehicular ${Math.round(vehicularArea)}m2, non-vehicular ${Math.round(nonArea)}m2 (${(share * 100).toFixed(1)}%)`);
     expect(share).toBeLessThan(0.35);
   });
 
-  it("ROAD-02 road network is continuous: low dangling-endpoint rate", () => {
-    const ends = new Map<string, number>();
+  it("ROAD-02 road network is continuous: low true dangling-stub rate", () => {
+    // Exact-endpoint connectivity: a stub = endpoint with no other endpoint
+    // within 0.5m and not near the fixture bbox edge (roads legitimately end
+    // at the world boundary).
+    const bbox = fixture.manifest.bbox as [number, number, number, number];
+    const ends = new Map<string, { x: number; z: number }>();
+    const degree = new Map<string, number>();
     for (const line of allRoadLines) {
-      const a = `${Math.round(line[0][0])},${Math.round(line[0][1])}`;
-      const b = `${Math.round(line[line.length - 1][0])},${Math.round(line[line.length - 1][1])}`;
-      ends.set(a, (ends.get(a) ?? 0) + 1);
-      ends.set(b, (ends.get(b) ?? 0) + 1);
+      const a = `${line[0][0].toFixed(3)},${line[0][1].toFixed(3)}`;
+      const b = `${line[line.length - 1][0].toFixed(3)},${line[line.length - 1][1].toFixed(3)}`;
+      ends.set(a, { x: line[0][0], z: line[0][1] });
+      ends.set(b, { x: line[line.length - 1][0], z: line[line.length - 1][1] });
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      degree.set(b, (degree.get(b) ?? 0) + 1);
     }
-    let dangling = 0;
-    for (const v of ends.values()) if (v === 1) dangling++;
-    console.log(`endpoint degree-1 nodes: ${dangling} of ${ends.size}`);
-    expect(dangling / Math.max(1, ends.size)).toBeLessThan(0.4);
+    const w = bbox[2] - bbox[0];
+    const h = bbox[3] - bbox[1];
+    const nearEdge = (x: number, z: number): boolean =>
+      x < w * 0.03 || x > w * 0.97 || z < h * 0.03 || z > h * 0.97;
+    let stubs = 0;
+    for (const [k, pos] of ends) {
+      if ((degree.get(k) ?? 0) > 1) continue;
+      if (nearEdge(pos.x, pos.z)) continue;
+      let connected = false;
+      for (const [k2, pos2] of ends) {
+        if (k2 === k) continue;
+        if (Math.hypot(pos.x - pos2.x, pos.z - pos2.z) <= 0.5) {
+          connected = true;
+          break;
+        }
+      }
+      if (!connected) stubs++;
+    }
+    console.log(`true dangling stubs (exact endpoints, off-edge): ${stubs} of ${ends.size}`);
+    expect(stubs / Math.max(1, ends.size)).toBeLessThan(0.15);
   });
 
   it("B-01 building base elevation tracks terrain coherently (no deep burial)", () => {

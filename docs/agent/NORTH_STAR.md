@@ -21,6 +21,10 @@ world streams around the player. Returning to an area reproduces the same world.
 - No paid API dependency for the core experience.
 - Evidence-backed fidelity: OBSERVED / DERIVED / INFERRED classes, never fake truth.
 - Usable UI: keyboard controls, readable labels, loading states, failure handling.
+- Owner visual spec (R-028/R-029/R-030): stylized miniature readability per
+  docs/agent/VISUAL_PRODUCT_SPEC.md + REAL_WORLD_FIDELITY_POLICY.md, gated by
+  docs/agent/STYLE_ACCEPTANCE.md. Appeal comes from stylizing real evidence,
+  never from fabricated decoration.
 
 ## NOT THE GOAL
 - Photorealism or exact reconstruction of every window worldwide.

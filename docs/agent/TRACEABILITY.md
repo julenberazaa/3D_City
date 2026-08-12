@@ -32,3 +32,6 @@ Updated 2026-08-11 (final release). Every state is backed by executable evidence
 | R-025 | src/data/live.ts (network classification), src/cache/store.ts (corruption), src/stream/streamer.ts (failure slot release) | cache.test.ts, live.spec.ts, streamer-race.test.ts | — | PASS |
 | R-026 | src/main.ts (search a11y), src/style.css | search.spec.ts (arrows/aria/live-region/status) | — | PASS |
 | R-027 | global (parseBbox validation, no eval) | harness gate 19 (audit/secret scan) | npm audit clean | PASS |
+| R-028 | src/world/generator.ts, src/render/labels.ts, src/main.ts, src/render/car.ts | fidelity.test.ts, label unit tests, before/after screenshots, Luna review | reports/visual/style-recovery/ + STYLE_ACCEPTANCE | ACTIVE |
+| R-029 | src/data/fixtureBuilder.ts, src/world/generator.ts, src/physics/world.ts | fidelity.test.ts (ROAD-01/02, spawn), tree determinism test | code audit; determinism tests | ACTIVE |
+| R-030 | global (release process) | fidelity gates + e2e + harness + real-GPU sanity + Luna | reports/visual/style-recovery/after/, hardware sanity json | ACTIVE |
