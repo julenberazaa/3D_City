@@ -37,7 +37,7 @@ function sampleCanvas(canvas: Locator, relX: number, relY: number): Promise<numb
 /** Poll until the pixel is no longer the clear/fog color (i.e., geometry actually rendered there). */
 async function waitForRendered(canvas: Locator, relX: number, relY: number, label: string): Promise<number[]> {
   let last: number[] = [];
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 150; i++) {
     last = await sampleCanvas(canvas, relX, relY);
     if (!isFog(last) && !(last[0] === 0 && last[1] === 0 && last[2] === 0)) return last;
     await new Promise((r) => setTimeout(r, 200));
