@@ -1,19 +1,22 @@
-# NEXT ACTION — never lose the thread
+# NEXT ACTION
 
-CURRENT MILESTONE: Final release — SHIPPED.
-CURRENT WORK PACKAGE: none (WP-00..WP-14 final).
-CURRENT BLOCKER: none.
-NEXT SINGLE ACTION: No required engineering action remains. The release is deployed
-and verified (https://julenberazaa.github.io/3D_City/). Optional future work below.
-WHY IT IS NEXT: — (release complete).
-ACCEPTANCE CONDITION: —.
-EVIDENCE TO PRODUCE: —.
+CURRENT MILESTONE: Fidelity + style recovery candidate COMPLETE (branch `fidelity-recovery`).
 
-## Optional future enhancements (NOT required for V1)
-- WP-10 walk mode (Rapier KinematicCharacterController).
-- Web Worker offload of chunk generation (documented in OPTIMIZATION_LOG; async
-  batching already meets the acceptance).
-- R-019 tunnel elevation handling (bridge rule covers the common case).
-- Water/coast terrain flattening under the water surface (visual coherence).
-- P2: full axe-style a11y audit, HUD sizing, fog washout tuning.
-- P3: Panoramax facade imagery, traffic/pedestrians.
+CURRENT BLOCKER: none (all objective gates green; owner decision pending on merge).
+
+NEXT REQUIRED ACTION: **owner approval of the recovery candidate** — review the
+before/after screenshots (reports/visual/style-recovery/) and the Luna verdict
+(PREFERRED_VERSION: AFTER, no CRITICAL). On approval: merge `fidelity-recovery`
+to `main` (no force push), let CI run (verify + deploy-pages), then run
+`node scripts/perf/verify-deployed.mjs` against the public URL and capture
+`reports/visual/final-ux/deployed-final.png`.
+
+Optional future work (NOT required for this milestone):
+- Walk mode (R-020, deferred)
+- Tunnel refinement
+- Water/coast refinement (shoreline + bridges are in)
+- Camera collision system (only if framing near tall buildings becomes an issue)
+- Web Worker offload only if future profiling justifies it
+- Panoramax facade imagery (P3)
+- Full axe audit (P2)
+- Lane markings / more detailed intersection styling
