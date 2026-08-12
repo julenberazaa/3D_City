@@ -459,6 +459,10 @@ async function boot(): Promise<void> {
           camSmooth.lerp(camTarget, k);
           lookSmooth.lerp(lookTarget, k);
         }
+        // Ground-guard: never let the look target climb above the camera's own
+        // height minus a floor so the view always keeps terrain/road in frame
+        // (prevents sky-dominant frames on rising ground).
+        if (lookSmooth.y > camSmooth.y - 22) lookSmooth.y = camSmooth.y - 22;
         orbit.camera.position.copy(camSmooth);
         orbit.camera.lookAt(lookSmooth);
       }

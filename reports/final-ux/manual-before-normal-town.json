@@ -3,17 +3,17 @@
   "label": "Zurich (normal town)",
   "url": "http://localhost:4174/?bbox=8.49,47.34,8.55,47.39",
   "drivenM": 801,
-  "durationS": 154,
+  "durationS": 155,
   "recoveries": 4,
   "teleports": [],
-  "steeringEvents": 56,
+  "steeringEvents": 59,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.3,
-    "p99": 6.5
+    "p95": 6.2,
+    "p99": 6.4
   },
   "severeStalls250ms": 4,
-  "longestFrameMs": 14704,
+  "longestFrameMs": 14468,
   "consoleErrors": [
     "Failed to load resource: the server responded with a status of 404 (Not Found)"
   ],

@@ -2,18 +2,18 @@
   "scenario": "dense-urban",
   "label": "Manhattan (dense urban)",
   "url": "http://localhost:4173/?bbox=-74.015,40.700,-73.960,40.735",
-  "drivenM": 500,
-  "durationS": 252,
-  "recoveries": 0,
+  "drivenM": 1254,
+  "durationS": 90,
+  "recoveries": 1,
   "teleports": [],
-  "steeringEvents": 152,
+  "steeringEvents": 51,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.2,
-    "p99": 6.5
+    "p95": 12.2,
+    "p99": 12.3
   },
-  "severeStalls250ms": 0,
-  "longestFrameMs": 79,
+  "severeStalls250ms": 1,
+  "longestFrameMs": 1466,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/after-dense-urban-spawn.png",

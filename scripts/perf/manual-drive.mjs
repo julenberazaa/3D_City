@@ -45,7 +45,22 @@ async function runScenario(browser, name, cfg, tag) {
     if (statusText.includes("unavailable")) throw new Error(`BLOCKED_EXTERNAL: live sources unreachable (${statusText})`);
     throw new Error(`boot failed; status=${statusText}`);
   }
-
+  // Wait for actual rendered pixels (chunk build is async; "Ready" precedes
+  // the first frame): poll center + lower-third until they are not fog/sky.
+  await page.waitForFunction(() => {
+    const c = document.querySelector("canvas");
+    if (!c) return false;
+    const ctx = c.getContext("webgl2");
+    if (!ctx) return false;
+    const x = Math.floor(c.width * 0.5);
+    const y = Math.floor(c.height * 0.45);
+    const px = new Uint8Array(4);
+    ctx.readPixels(x, y, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+    return px[3] > 0 && (px[0] > 12 || px[1] > 12 || px[2] > 12);
+  }, { timeout: 60000 }).catch(() => {
+    // Even a sky frame is fine after the cap — the shot is best-effort.
+  });
+  await page.waitForTimeout(1200);
   await page.screenshot({ path: join(SHOT_DIR, `${tag}-${name}-spawn.png`) });
 
   const stats = await page.evaluate(() => {
