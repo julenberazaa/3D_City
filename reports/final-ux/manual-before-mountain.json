@@ -1,19 +1,19 @@
 {
   "scenario": "mountain",
   "label": "Zermatt (mountainous)",
-  "url": "http://localhost:4173/?bbox=7.73,45.99,7.78,46.03",
-  "drivenM": 505,
-  "durationS": 96,
+  "url": "http://localhost:4174/?bbox=7.73,45.99,7.78,46.03",
+  "drivenM": 567,
+  "durationS": 90,
   "recoveries": 1,
   "teleports": [],
   "steeringEvents": 55,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.4,
-    "p99": 6.6
+    "p95": 6.2,
+    "p99": 6.3
   },
   "severeStalls250ms": 0,
-  "longestFrameMs": 67,
+  "longestFrameMs": 55,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/before-mountain-spawn.png",

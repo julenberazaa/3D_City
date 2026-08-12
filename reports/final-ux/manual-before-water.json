@@ -1,0 +1,22 @@
+{
+  "scenario": "water",
+  "label": "SF downtown fixture (water visible)",
+  "url": "http://localhost:4174/?fixture=sf-downtown",
+  "drivenM": 401,
+  "durationS": 212,
+  "recoveries": 8,
+  "teleports": [],
+  "steeringEvents": 102,
+  "fpsMedian": 164,
+  "frameMs": {
+    "p95": 6.2,
+    "p99": 6.3
+  },
+  "severeStalls250ms": 8,
+  "longestFrameMs": 4405,
+  "consoleErrors": [],
+  "evidence": [
+    "reports/visual/final-ux/before-water-spawn.png",
+    "reports/visual/final-ux/before-water-drive.png"
+  ]
+}

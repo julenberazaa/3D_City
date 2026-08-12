@@ -875,7 +875,7 @@ const BUILDING_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, ver
 
 // --- Trees (deterministic stylized placement, shared geometries) ------------
 
-const TREE_CAP_PER_CHUNK = 100;
+const TREE_CAP_PER_CHUNK = 80;
 let TREE_GEO: { trunk: THREE.CylinderGeometry; foliage: THREE.ConeGeometry } | null = null;
 
 function treeGeometries(): { trunk: THREE.CylinderGeometry; foliage: THREE.ConeGeometry } {
@@ -937,7 +937,7 @@ function buildTreeChunkExtras(
       minZ = Math.min(minZ, z);
       maxZ = Math.max(maxZ, z);
     }
-    const spacing = cls === "forest" ? 6.5 : 11;
+    const spacing = cls === "forest" ? 8 : 13;
     const cols = Math.max(1, Math.floor((maxX - minX) / spacing));
     const rows = Math.max(1, Math.floor((maxZ - minZ) / spacing));
     const seed = fnv1a(f.id);

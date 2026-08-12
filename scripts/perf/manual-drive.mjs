@@ -15,6 +15,7 @@ const SCENARIOS = {
   "normal-town": { url: `${BASE}/?bbox=8.49,47.34,8.55,47.39`, min: { secs: 90, dist: 800 }, label: "Zurich (normal town)" },
   "dense-urban": { url: `${BASE}/?bbox=-74.015,40.700,-73.960,40.735`, min: { secs: 90, dist: 500 }, label: "Manhattan (dense urban)" },
   "mountain": { url: `${BASE}/?bbox=7.73,45.99,7.78,46.03`, min: { secs: 90, dist: 500 }, label: "Zermatt (mountainous)" },
+  "water": { url: `${BASE}/?fixture=sf-downtown`, min: { secs: 60, dist: 400 }, label: "SF downtown fixture (water visible)" },
 };
 
 const DURATION_MS = 20 * 60 * 1000;

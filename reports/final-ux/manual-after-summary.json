@@ -1,0 +1,90 @@
+{
+  "normal-town": {
+    "scenario": "normal-town",
+    "label": "Zurich (normal town)",
+    "url": "http://localhost:4173/?bbox=8.49,47.34,8.55,47.39",
+    "drivenM": 800,
+    "durationS": 400,
+    "recoveries": 1,
+    "teleports": [],
+    "steeringEvents": 226,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 11.8,
+      "p99": 12.2
+    },
+    "severeStalls250ms": 0,
+    "longestFrameMs": 48,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/after-normal-town-spawn.png",
+      "reports/visual/final-ux/after-normal-town-drive.png"
+    ]
+  },
+  "dense-urban": {
+    "scenario": "dense-urban",
+    "label": "Manhattan (dense urban)",
+    "url": "http://localhost:4173/?bbox=-74.015,40.700,-73.960,40.735",
+    "drivenM": 500,
+    "durationS": 252,
+    "recoveries": 0,
+    "teleports": [],
+    "steeringEvents": 152,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 6.2,
+      "p99": 6.5
+    },
+    "severeStalls250ms": 0,
+    "longestFrameMs": 79,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/after-dense-urban-spawn.png",
+      "reports/visual/final-ux/after-dense-urban-drive.png"
+    ]
+  },
+  "mountain": {
+    "scenario": "mountain",
+    "label": "Zermatt (mountainous)",
+    "url": "http://localhost:4173/?bbox=7.73,45.99,7.78,46.03",
+    "drivenM": 501,
+    "durationS": 138,
+    "recoveries": 2,
+    "teleports": [],
+    "steeringEvents": 79,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 12.2,
+      "p99": 12.3
+    },
+    "severeStalls250ms": 0,
+    "longestFrameMs": 42,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/after-mountain-spawn.png",
+      "reports/visual/final-ux/after-mountain-drive.png"
+    ]
+  },
+  "water": {
+    "scenario": "water",
+    "label": "SF downtown fixture (water visible)",
+    "url": "http://localhost:4173/?fixture=sf-downtown",
+    "drivenM": 401,
+    "durationS": 215,
+    "recoveries": 0,
+    "teleports": [],
+    "steeringEvents": 133,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 6.2,
+      "p99": 6.3
+    },
+    "severeStalls250ms": 0,
+    "longestFrameMs": 12,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/after-water-spawn.png",
+      "reports/visual/final-ux/after-water-drive.png"
+    ]
+  }
+}
