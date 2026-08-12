@@ -158,8 +158,8 @@ class VertexBuilder {
 }
 
 const ROAD_WIDTHS: Record<string, number> = {
-  motorway: 14,
-  trunk: 11,
+  motorway: 7.5,
+  trunk: 6.5,
   primary: 9,
   secondary: 7.5,
   tertiary: 6,
@@ -167,12 +167,136 @@ const ROAD_WIDTHS: Record<string, number> = {
   service: 4,
   living_street: 4.5,
   unclassified: 4,
-  pedestrian: 4,
-  footway: 2.5,
-  path: 2,
-  steps: 2.5,
-  cycleway: 2.5,
+  pedestrian: 3,
+  footway: 1.8,
+  path: 1.4,
+  steps: 1.8,
+  cycleway: 1.8,
 };
+
+const NON_VEHICULAR_CLASSES = new Set(["footway", "path", "steps", "pedestrian", "cycleway", "track"]);
+
+const CURB_COLOR: number[] = [0.23, 0.23, 0.25];
+const ROAD_SURFACE: number[] = [0.44, 0.44, 0.46];
+const PATH_COLOR: number[] = [0.3, 0.29, 0.28];
+const CURB_INSET = 1.0;
+
+interface RoadJunction {
+  x: number;
+  z: number;
+  radius: number;
+  features: Array<{ f: FixtureFeature; width: number }>;
+}
+
+function normalize2(dx: number, dz: number): [number, number] | null {
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-9) return null;
+  return [dx / len, dz / len];
+}
+
+/** Trim the polyline end that connects to `junction` (walk inward by radius). */
+function trimToRadius(pts: number[][], fromStart: boolean, radius: number): number[][] {
+  if (pts.length < 2 || radius <= 0) return pts;
+  const out = pts.map((p) => [p[0], p[1]] as number[]);
+  let i = fromStart ? 0 : out.length - 1;
+  const step = fromStart ? 1 : -1;
+  let remaining = radius;
+  while (out.length > 2) {
+    const a = out[i]!;
+    const b = out[i + step]!;
+    const seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (seg <= remaining) {
+      out.splice(i, 1);
+      if (fromStart) i = 0;
+      else i = out.length - 1;
+      remaining -= seg;
+    } else {
+      const t = remaining / Math.max(1e-9, seg);
+      if (fromStart) {
+        out[0] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      } else {
+        out[out.length - 1] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      }
+      break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Mitered ribbon pass: emits quads for one road strip (outer curb pass or inner
+ * surface pass). Interior vertices use clamped miter joins; ends use plain
+ * perpendicular offsets. Deterministic.
+ */
+function emitRibbon(
+  vb: VertexBuilder,
+  pts: number[][],
+  half: number,
+  yAt: (x: number, z: number, i: number) => number,
+  color: number[],
+  bridgeY: (x: number, z: number) => number | null,
+): void {
+  const n = pts.length;
+  if (n < 2) return;
+  const left: number[][] = [];
+  const right: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[Math.max(0, i - 1)]!;
+    const next = pts[Math.min(n - 1, i + 1)]!;
+    let d1 = normalize2(pts[i]![0] - prev[0], pts[i]![1] - prev[1]);
+    let d2 = normalize2(next[0] - pts[i]![0], next[1] - pts[i]![1]);
+    if (!d1) d1 = d2;
+    if (!d2) d2 = d1;
+    const n1: [number, number] = [-d1![1], d1![0]];
+    if (i === 0 || i === n - 1) {
+      left.push([pts[i]![0] + n1[0] * half, pts[i]![1] + n1[1] * half]);
+      right.push([pts[i]![0] - n1[0] * half, pts[i]![1] - n1[1] * half]);
+      continue;
+    }
+    // Miter: intersection of the two offset lines lies on the bisector.
+    const cross = d1[0] * d2[1] - d1[1] * d2[0];
+    const dsum = Math.abs(d1[0] + d2[0]) + Math.abs(d1[1] + d2[1]);
+    let off = 0;
+    if (dsum < 1e-6) {
+      off = half;
+    } else {
+      const bx = d1[0] + d2[0];
+      const bz = d1[1] + d2[1];
+      const bl = Math.hypot(bx, bz);
+      const bLx = -bz / bl;
+      const bLz = bx / bl;
+      const s = Math.abs(n1[0] * bLx + n1[1] * bLz);
+      off = s > 0.25 ? half / s : half;
+    }
+    const miter = Math.min(off, half * 1.5);
+    const nL: [number, number] = [n1[0] * miter, n1[1] * miter];
+    void cross;
+    left.push([pts[i]![0] + nL[0], pts[i]![1] + nL[1]]);
+    right.push([pts[i]![0] - nL[0], pts[i]![1] - nL[1]]);
+  }
+  for (let i = 0; i < n - 1; i++) {
+    const yA = bridgeY(pts[i]![0], pts[i]![1]) ?? yAt(pts[i]![0], pts[i]![1], i);
+    const yB = bridgeY(pts[i + 1]![0], pts[i + 1]![1]) ?? yAt(pts[i + 1]![0], pts[i + 1]![1], i + 1);
+    const a = vb.add(left[i]![0], yA, left[i]![1], color[0], color[1], color[2]);
+    const b2 = vb.add(right[i]![0], yA, right[i]![1], color[0], color[1], color[2]);
+    const c2 = vb.add(left[i + 1]![0], yB, left[i + 1]![1], color[0], color[1], color[2]);
+    const d = vb.add(right[i + 1]![0], yB, right[i + 1]![1], color[0], color[1], color[2]);
+    const ax = left[i]![0];
+    const az = left[i]![1];
+    const bx = right[i]![0];
+    const bz = right[i]![1];
+    const cx = left[i + 1]![0];
+    const cz = left[i + 1]![1];
+    const dx = right[i + 1]![0];
+    const dz = right[i + 1]![1];
+    const ny2 = (cz - az) * (bx - ax) - (cx - ax) * (bz - az);
+    const ny3 = (cz - bz) * (dx - bx) - (cx - bx) * (dz - bz);
+    if (ny2 < 0) vb.tri(a, b2, c2);
+    else vb.tri(a, c2, b2);
+    if (ny3 < 0) vb.tri(b2, d, c2);
+    else vb.tri(b2, c2, d);
+  }
+}
 
 const FACADE_PALETTE: number[][] = [
   [0.78, 0.63, 0.48],
@@ -490,6 +614,20 @@ function buildRoadChunkMesh(
 ): { mesh: THREE.Mesh | null; count: number } {
   const vb = new VertexBuilder();
   let count = 0;
+
+  const yAt = (x: number, z: number): number => sampleTerrain(terrain, x, z) + 0.06;
+  const bridgeY = (x: number, z: number): number | null =>
+    waterRings.some((ring) => pointInRing(x, z, ring)) ? WATER_LEVEL + 0.3 : null;
+
+  // Deduped polylines per feature.
+  interface Seg {
+    f: FixtureFeature;
+    pts: number[][];
+    width: number;
+    vehicular: boolean;
+    connectors?: Array<{ id: string; at: number }>;
+  }
+  const segs: Seg[] = [];
   for (const f of c.features) {
     if (!f.line || f.line.length < 2) continue;
     const pts: number[][] = [];
@@ -498,57 +636,74 @@ function buildRoadChunkMesh(
       if (!last || last[0] !== p[0] || last[1] !== p[1]) pts.push(p);
     }
     if (pts.length < 2) continue;
-    const width = ROAD_WIDTHS[f.class ?? ""] ?? 4;
-    const classVar = (fnv1a(f.class ?? "") % 3 - 1) * 0.03;
-    const r = 0.32 + classVar;
-    const g = 0.32 + classVar;
-    const b = 0.34 + classVar;
-    const left: number[][] = [];
-    const right: number[][] = [];
-    const y: number[] = [];
-    for (let i = 0; i < pts.length; i++) {
-      const prev = pts[Math.max(0, i - 1)];
-      const next = pts[Math.min(pts.length - 1, i + 1)];
-      let dx = next[0] - prev[0];
-      let dz = next[1] - prev[1];
-      const len = Math.hypot(dx, dz);
-      if (len < 1e-9) {
-        dx = 1;
-        dz = 0;
-      } else {
-        dx /= len;
-        dz /= len;
+    const vehicular = !NON_VEHICULAR_CLASSES.has(f.class ?? "");
+    segs.push({
+      f,
+      pts,
+      width: ROAD_WIDTHS[f.class ?? ""] ?? 4,
+      vehicular,
+      connectors: f.connectors,
+    });
+  }
+
+  // Junction graph from connector ids (Overture junction topology).
+  const junctions = new Map<string, RoadJunction>();
+  for (const s of segs) {
+    for (const conn of s.connectors ?? []) {
+      let j = junctions.get(conn.id);
+      if (!j) {
+        const pos = conn.at <= 0.5 ? s.pts[0]! : s.pts[s.pts.length - 1]!;
+        j = { x: pos[0], z: pos[1], radius: 0, features: [] };
+        junctions.set(conn.id, j);
       }
-      const h = sampleTerrain(terrain, pts[i][0], pts[i][1]) + 0.06;
-      const overWater = waterRings.some((ring) => pointInRing(pts[i][0], pts[i][1], ring));
-      left.push([pts[i][0] + (-dz) * (width / 2), pts[i][1] + dx * (width / 2)]);
-      right.push([pts[i][0] - (-dz) * (width / 2), pts[i][1] - dx * (width / 2)]);
-      // Bridge rule: roads crossing water are decks at the water surface so
-      // they never dive into the bay/river bed (WP-09/R-019 minimal set).
-      y.push(overWater ? WATER_LEVEL + 0.3 : h);
+      j.features.push({ f: s.f, width: s.width });
+      j.radius = Math.max(j.radius, s.width / 2);
     }
-    for (let i = 0; i < pts.length - 1; i++) {
-      const ax = left[i][0];
-      const az = left[i][1];
-      const bx = right[i][0];
-      const bz = right[i][1];
-      const cx = left[i + 1][0];
-      const cz = left[i + 1][1];
-      const dx = right[i + 1][0];
-      const dz = right[i + 1][1];
-      const ny1 = (cz - az) * (bx - ax) - (cx - ax) * (bz - az);
-      const ny2 = (cz - bz) * (dx - bx) - (cx - bx) * (dz - bz);
-      const a = vb.add(ax, y[i], az, r, g, b);
-      const b2 = vb.add(bx, y[i], bz, r, g, b);
-      const c2 = vb.add(cx, y[i + 1], cz, r, g, b);
-      const d = vb.add(dx, y[i + 1], dz, r, g, b);
-      if (ny1 < 0) vb.tri(a, b2, c2);
-      else vb.tri(a, c2, b2);
-      if (ny2 < 0) vb.tri(b2, d, c2);
-      else vb.tri(b2, c2, d);
+  }
+
+  // Trim ribbons to their junction radii and emit passes.
+  for (const s of segs) {
+    let pts = s.pts;
+    for (const conn of s.connectors ?? []) {
+      const j = junctions.get(conn.id);
+      if (!j) continue;
+      if (j.features.length >= 2) {
+        pts = trimToRadius(pts, conn.at <= 0.5, j.radius + (s.vehicular ? 0 : 0.2));
+      }
+    }
+    if (pts.length < 2) continue;
+    const clsVar = (fnv1a(s.f.class ?? "") % 3 - 1) * 0.015;
+    if (s.vehicular) {
+      const surface: number[] = [ROAD_SURFACE[0] + clsVar, ROAD_SURFACE[1] + clsVar, ROAD_SURFACE[2] + clsVar];
+      const inset = Math.min(CURB_INSET, s.width / 4);
+      emitRibbon(vb, pts, s.width / 2, yAt, CURB_COLOR, bridgeY);
+      emitRibbon(vb, pts, s.width / 2 - inset, yAt, surface, bridgeY);
+    } else {
+      const path: number[] = [PATH_COLOR[0] + clsVar, PATH_COLOR[1] + clsVar, PATH_COLOR[2] + clsVar];
+      emitRibbon(vb, pts, s.width / 2, yAt, path, bridgeY);
     }
     count++;
   }
+
+  // Junction caps: one polygon per junction with >=2 incident roads, sized to
+  // the largest incident half-width; fills the trimmed crossing.
+  for (const j of junctions.values()) {
+    if (j.features.length < 2) continue;
+    const N = 10;
+    const y = bridgeY(j.x, j.z) ?? yAt(j.x, j.z);
+    for (let k = 0; k < N; k++) {
+      const a0 = (2 * Math.PI * k) / N;
+      const a1 = (2 * Math.PI * (k + 1)) / N;
+      const p0: number[] = [j.x + Math.cos(a0) * j.radius, j.z + Math.sin(a0) * j.radius];
+      const p1: number[] = [j.x + Math.cos(a1) * j.radius, j.z + Math.sin(a1) * j.radius];
+      const va = vb.add(p0[0], y, p0[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
+      const vc = vb.add(p1[0], y, p1[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
+      const vctr = vb.add(j.x, y, j.z, ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
+      vb.tri(vctr, va, vc);
+    }
+    count++;
+  }
+
   return { mesh: vb.toMesh(ROAD_MATERIAL), count };
 }
 
