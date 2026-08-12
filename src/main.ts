@@ -421,7 +421,6 @@ async function boot(): Promise<void> {
       vehicle.setSteer(controls.steer);
       vehicle.setBrake(controls.brake);
       if (bench) bench.tick(dt, benchElapsed);
-      const fwd = vehicle.forward();
       streamer.update({
         x: latestCarPos.x,
         z: latestCarPos.z,
