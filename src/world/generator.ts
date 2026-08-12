@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createLabelSprite, labelPriorityOf, MAX_LABELS_PER_CHUNK } from "../render/labels";
 
 /** Stylized water level (meters, fixture-local). INFERRED constant, documented in PROVENANCE.md. */
 export const WATER_LEVEL = 0.0;
@@ -528,6 +529,7 @@ function buildTerrainChunkMesh(c: ChunkTerrain): THREE.Mesh | null {
 function buildWaterChunkMesh(c: ChunkRecord): { mesh: THREE.Mesh | null; count: number } {
   const vb = new VertexBuilder();
   let count = 0;
+  const SHORE: number[] = [0.09, 0.22, 0.34];
   for (const f of c.features) {
     if (!f.ring) continue;
     const pts = decimateRing(distinctPoints(f.ring));
@@ -545,10 +547,12 @@ function buildWaterChunkMesh(c: ChunkRecord): { mesh: THREE.Mesh | null; count: 
         const [x, z] = pts[p];
         const v = (base + p) % 5;
         const lightness = 0.02 * (v - 2);
-        return vb.add(x, WATER_LEVEL - 0.05, z, 0.18 + lightness, 0.42 + lightness, 0.62 + lightness);
+        return vb.add(x, WATER_LEVEL - 0.05, z, 0.16 + lightness, 0.4 + lightness, 0.62 + lightness);
       });
       vb.tri(idx[0], idx[1], idx[2]);
     }
+    // Shoreline ring: darker inward strip that separates water from land.
+    emitRibbon(vb, pts, 0.55, () => WATER_LEVEL - 0.06, SHORE, () => null);
   }
   return { mesh: vb.toMesh(WATER_MATERIAL), count };
 }
@@ -869,6 +873,105 @@ const WATER_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertex
 const LANDCOVER_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertexColors: true });
 const BUILDING_MATERIAL = new THREE.MeshLambertMaterial({ flatShading: true, vertexColors: true });
 
+// --- Trees (deterministic stylized placement, shared geometries) ------------
+
+const TREE_CAP_PER_CHUNK = 100;
+let TREE_GEO: { trunk: THREE.CylinderGeometry; foliage: THREE.ConeGeometry } | null = null;
+
+function treeGeometries(): { trunk: THREE.CylinderGeometry; foliage: THREE.ConeGeometry } {
+  if (!TREE_GEO) {
+    TREE_GEO = {
+      trunk: new THREE.CylinderGeometry(0.14, 0.2, 0.9, 6),
+      foliage: new THREE.ConeGeometry(1.25, 2.6, 7),
+    };
+  }
+  return TREE_GEO;
+}
+
+function distToPolyline(px: number, pz: number, line: number[][]): number {
+  let best = Infinity;
+  for (let i = 0; i < line.length - 1; i++) {
+    const ax = line[i]![0];
+    const az = line[i]![1];
+    const bx = line[i + 1]![0];
+    const bz = line[i + 1]![1];
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len2 = dx * dx + dz * dz;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
+    best = Math.min(best, Math.hypot(px - (ax + t * dx), pz - (az + t * dz)));
+  }
+  return best;
+}
+
+/**
+ * Deterministic stylized trees inside real green polygons (forest/grass),
+ * cleared of roads/buildings/water. Seeded per (chunk,index) — no Math.random.
+ */
+function buildTreeChunkExtras(
+  landcover: ChunkRecord | undefined,
+  roads: ChunkRecord | undefined,
+  buildings: ChunkRecord | undefined,
+  terrain: ChunkTerrain[],
+): THREE.Group | null {
+  if (!landcover) return null;
+  const roadLines: number[][][] = [];
+  for (const f of roads?.features ?? []) if (f.line) roadLines.push(f.line);
+  const buildingRings: number[][][] = [];
+  for (const f of buildings?.features ?? []) if (f.ring) buildingRings.push(f.ring);
+  const group = new THREE.Group();
+  let placed = 0;
+  for (const f of landcover.features) {
+    if (!f.ring || placed >= TREE_CAP_PER_CHUNK) continue;
+    const cls = f.class;
+    if (cls !== "forest" && cls !== "grass") continue;
+    const pts = distinctPoints(f.ring);
+    if (pts.length < 3) continue;
+    let minX = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxZ = -Infinity;
+    for (const [x, z] of pts) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+    }
+    const spacing = cls === "forest" ? 6.5 : 11;
+    const cols = Math.max(1, Math.floor((maxX - minX) / spacing));
+    const rows = Math.max(1, Math.floor((maxZ - minZ) / spacing));
+    const seed = fnv1a(f.id);
+    for (let r = 0; r < rows && placed < TREE_CAP_PER_CHUNK; r++) {
+      for (let c = 0; c < cols && placed < TREE_CAP_PER_CHUNK; c++) {
+        const h1 = (fnv1a(`${f.id}:${r}:${c}:${seed}`) % 1000) / 1000;
+        const h2 = (fnv1a(`${f.id}:${c}:${r}:${seed ^ 0x9e37}`) % 1000) / 1000;
+        const x = minX + (c + 0.25 + h1 * 0.5) * spacing;
+        const z = minZ + (r + 0.25 + h2 * 0.5) * spacing;
+        if (!pointInRing(x, z, pts)) continue;
+        if (roadLines.some((line) => distToPolyline(x, z, line) < 2.5)) continue;
+        if (buildingRings.some((ring) => pointInRing(x, z, ring))) continue;
+        const scale = 0.7 + h1 * 0.6;
+        const geo = treeGeometries();
+        const y = sampleTerrain(terrain, x, z);
+        const trunk = new THREE.Mesh(geo.trunk, new THREE.MeshLambertMaterial({ color: 0x5d4430 }));
+        trunk.position.set(x, y + 0.45 * scale, z);
+        trunk.scale.setScalar(scale);
+        const foliageTone = cls === "forest" ? 0.23 + h2 * 0.12 : 0.34 + h2 * 0.16;
+        const foliage = new THREE.Mesh(
+          geo.foliage,
+          new THREE.MeshLambertMaterial({ color: new THREE.Color(foliageTone, 0.4 + h2 * 0.22, 0.18 + h2 * 0.12) }),
+        );
+        foliage.position.set(x, y + (0.9 + 1.3) * scale, z);
+        foliage.scale.setScalar(scale);
+        group.add(trunk);
+        group.add(foliage);
+        placed++;
+      }
+    }
+  }
+  return placed > 0 ? group : null;
+}
+
 export interface ChunkBuildResult {
   group: THREE.Group;
   counts: { buildings: number; roads: number; waterPolys: number; landcover: number };
@@ -916,6 +1019,54 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
   addChunk(fixture.water, (c) => buildWaterChunkMesh(c), "waterPolys");
   yield;
   addChunk(fixture.landcover, (c) => buildLandcoverChunkMesh(c, fixture.terrain), "landcover");
+  yield;
+  // Street labels (named vehicular roads, class-prioritized, density-capped).
+  const rRec = fixture.roads.find((c) => c.x === x && c.y === y);
+  if (rRec) {
+    const named: Array<{ name: string; x: number; z: number; prio: number; len: number }> = [];
+    const seen = new Set<string>();
+    for (const f of rRec.features) {
+      if (!f.line || f.line.length < 2) continue;
+      if (!f.name || seen.has(f.name)) continue;
+      const prio = labelPriorityOf(f.class ?? "");
+      if (prio < 1) continue;
+      seen.add(f.name);
+      let cum = 0;
+      let mid = 0;
+      for (let i = 0; i < f.line.length - 1; i++) {
+        mid += Math.hypot(f.line[i + 1]![0] - f.line[i]![0], f.line[i + 1]![1] - f.line[i]![1]);
+      }
+      const half = mid / 2;
+      for (let i = 0; i < f.line.length - 1; i++) {
+        const seg = Math.hypot(f.line[i + 1]![0] - f.line[i]![0], f.line[i + 1]![1] - f.line[i]![1]);
+        if (cum + seg >= half) {
+          const t = (half - cum) / Math.max(1e-9, seg);
+          named.push({
+            name: f.name,
+            x: f.line[i]![0] + (f.line[i + 1]![0] - f.line[i]![0]) * t,
+            z: f.line[i]![1] + (f.line[i + 1]![1] - f.line[i]![1]) * t,
+            prio,
+            len: f.name.length,
+          });
+          break;
+        }
+        cum += seg;
+      }
+    }
+    named.sort((a, b) => b.prio - a.prio || a.len - b.len);
+    for (const n of named.slice(0, MAX_LABELS_PER_CHUNK)) {
+      const y = sampleTerrain(fixture.terrain, n.x, n.z) + 3.2;
+      group.add(createLabelSprite({ name: n.name, x: n.x, z: n.z, y, scale: Math.min(13, 1.1 + n.len * 0.75) }));
+    }
+  }
+  yield;
+  // Stylized trees inside real green polygons (deterministic placement).
+  const lcRec = fixture.landcover.find((c) => c.x === x && c.y === y);
+  const bRec0 = fixture.buildings.find((c) => c.x === x && c.y === y);
+  if (lcRec || rRec) {
+    const trees = buildTreeChunkExtras(lcRec, rRec, bRec0, fixture.terrain);
+    if (trees) group.add(trees);
+  }
   yield;
 
   const bRec = fixture.buildings.find((c) => c.x === x && c.y === y);

@@ -260,7 +260,9 @@ describe("gate 09: generator sanity", () => {
     expect(tiny.counts.landcover).toBe(1);
     const waterMesh = tiny.groups.water.get("15-0-0")?.children[0] as THREE.Mesh;
     const lcMesh = tiny.groups.landcover.get("15-0-0")?.children[0] as THREE.Mesh;
-    expect((waterMesh.geometry.index?.count ?? 0) / 3).toBe(2);
+    // Water mesh = 2 fill triangles + 6 shoreline-ring triangles (big ring only;
+    // the tiny ring is filtered out of both fill and shore).
+    expect((waterMesh.geometry.index?.count ?? 0) / 3).toBe(8);
     expect((lcMesh.geometry.index?.count ?? 0) / 3).toBe(2);
   });
 });
