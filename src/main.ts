@@ -319,8 +319,8 @@ async function boot(): Promise<void> {
     // Elevated follow camera with exponential smoothing (game-feel R-021/R-028):
     // higher than the street canyon, more road ahead, no snap jitter. Smoothing
     // state resets on spawn/R so the view re-orients immediately.
-    const CAM_DIST = 22;
-    const CAM_HEIGHT = 15;
+    const CAM_DIST = 24;
+    const CAM_HEIGHT = 16;
     const CAM_LOOK_AHEAD = 20;
     const CAM_LOOK_AHEAD_SPEED = 0.35; // extra look-ahead m per km/h
     const camSmooth = new THREE.Vector3();
