@@ -154,14 +154,17 @@ function Test-Gate18SecurityDeps {
   }
   $exitCode = $job.ExitCode
   $out = Receive-Job $job; Remove-Job $job -Force
-  $auditOk = $exitCode -eq 0
-  $networky = ($out -join " ") -match "ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|network|fetch failed|ETIMEDOUT|timeout"
+  $joined = ($out -join " ")
+  # Job ExitCode is unreliable for npm.cmd shims; classify from output.
+  $auditOk = $joined -match "found 0 vulnerabilities"
+  $networky = $joined -match "ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network request|npm error network"
+  $vulns = $joined -match "vulnerabilities" -and -not ($joined -match "found 0 vulnerabilities")
   if (-not $auditOk -and $networky) {
     return @{ Status = "BLOCKED_EXTERNAL"; Detail = "npm audit failed with network errors (registry throttled/unreachable): $($out | Select-Object -Last 1)" }
   }
   $secrets = Get-ChildItem -Recurse -File -Path . -Exclude "*.log","package-lock.json" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "\\node_modules\\|\\reports\\|\\dist\\" } | Select-String -Pattern "AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" -ErrorAction SilentlyContinue
   $note = if ($secrets) { "; SECRET PATTERN FOUND in: $($secrets | Select-Object -First 3 | ForEach-Object { $_.Path })" } else { "" }
-  if (-not $auditOk -or $secrets) { return @{ Status = "FAIL"; Detail = "audit exit $exitCode$note" } }
+  if (-not $auditOk -or $vulns -or $secrets) { return @{ Status = "FAIL"; Detail = "audit exit $exitCode$note" } }
   return @{ Status = "PASS"; Detail = "npm audit clean, no secret patterns$note" }
 }
 
