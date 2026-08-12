@@ -35,6 +35,7 @@ test("search: type a place, pick it, and enter its live world", async ({ page })
     }
     throw new Error(`search→live boot failed; status=${status}`);
   });
+  await page.keyboard.press("KeyH");
   const hud = await page.locator("#hud").textContent();
   expect(hud).toContain("live");
   await page.screenshot({ path: "reports/visual/wp08-search-live.png" });

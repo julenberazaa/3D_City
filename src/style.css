@@ -82,6 +82,37 @@ body {
   pointer-events: none;
 }
 
+.mini-hud {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 10;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(16, 20, 24, 0.62);
+  color: #e8eef2;
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+  max-width: 46vw;
+}
+
+.mini-hud .place {
+  font-weight: 600;
+  color: #f2f6fa;
+}
+
+.mini-hud .speed {
+  font-weight: 700;
+  color: #ffd9a0;
+  margin-left: 8px;
+}
+
+.mini-hud .hint {
+  font-size: 11px;
+  color: #93a7b8;
+}
+
 .search-shell {
   height: 100%;
   display: flex;

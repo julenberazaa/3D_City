@@ -63,6 +63,7 @@ declare global {
 const root = document.getElementById("app")!;
 const statusEl = document.getElementById("status")!;
 const hudEl = document.getElementById("hud")!;
+const miniHudEl = document.getElementById("mini-hud")!;
 
 function setStatus(text: string, isError = false): void {
   statusEl.textContent = text;
@@ -342,6 +343,10 @@ async function boot(): Promise<void> {
     window.addEventListener("resize", resize);
 
     const fmt = (n: number) => n.toLocaleString("en-US");
+    const placeName = typeof fixture.manifest.name === "string" && fixture.manifest.name ? fixture.manifest.name : sourceLabel;
+    const updateMiniHud = () => {
+      miniHudEl.innerHTML = `<span class="place">${placeName}</span><span class="speed">${latestSpeedKmh.toFixed(0)} km/h</span><div class="hint">WASD/arrows drive · R recover · C camera · H details</div>`;
+    };
     const updateHud = () => {
       const stats = render.getStats();
       const stream = streamer.counters();
@@ -357,9 +362,17 @@ async function boot(): Promise<void> {
         `wheels ${latestWheels}/4   ${latestSpeedKmh.toFixed(0)} km/h   camera: ${followMode ? "follow (c)" : "orbit (c)"}   HUD: h`,
       ].join("\n");
     };
-    hudEl.hidden = false;
+    // Public game shows the small HUD by default; full diagnostics behind H.
+    // Benchmark mode keeps full diagnostics visible (instrumentation).
+    const benchMode = params.get("benchmark") !== null;
+    hudEl.hidden = !benchMode;
+    miniHudEl.hidden = false;
+    updateMiniHud();
     updateHud();
-    window.setInterval(updateHud, 500);
+    window.setInterval(() => {
+      updateMiniHud();
+      updateHud();
+    }, 500);
 
     window.addEventListener("keydown", (e) => {
       if (e.key.toLowerCase() === "h") hudEl.hidden = !hudEl.hidden;
@@ -372,6 +385,7 @@ async function boot(): Promise<void> {
         const spawn2 = findSpawnPoint(fixture.roads, fixture.terrain, fixture, latestCarPos);
         vehicle.reset(spawn2);
         latestCarPos.set(spawn2.x, spawn2.y, spawn2.z);
+        snapCamera();
         setStatus("Recovered");
       }
     });
@@ -425,16 +439,29 @@ async function boot(): Promise<void> {
       latestSpeedKmh = vehicle.speedKmh();
       latestWheels = vehicle.wheelsInContact();
       if (followMode) {
-        orbit.camera.position.set(
-          latestCarPos.x - fwd.x * 26,
-          latestCarPos.y + 12,
-          latestCarPos.z - fwd.z * 26,
+        const fwd = vehicle.forward();
+        const lookAhead = CAM_LOOK_AHEAD + Math.min(10, latestSpeedKmh * CAM_LOOK_AHEAD_SPEED);
+        const camTarget = new THREE.Vector3(
+          latestCarPos.x - fwd.x * CAM_DIST,
+          latestCarPos.y + CAM_HEIGHT,
+          latestCarPos.z - fwd.z * CAM_DIST,
         );
-        orbit.camera.lookAt(
-          latestCarPos.x + fwd.x * 16,
+        const lookTarget = new THREE.Vector3(
+          latestCarPos.x + fwd.x * lookAhead,
           latestCarPos.y + 2.5,
-          latestCarPos.z + fwd.z * 16,
+          latestCarPos.z + fwd.z * lookAhead,
         );
+        if (!camInit) {
+          camSmooth.copy(camTarget);
+          lookSmooth.copy(lookTarget);
+          camInit = true;
+        } else {
+          const k = 1 - Math.exp(-4.5 * dt);
+          camSmooth.lerp(camTarget, k);
+          lookSmooth.lerp(lookTarget, k);
+        }
+        orbit.camera.position.copy(camSmooth);
+        orbit.camera.lookAt(lookSmooth);
       }
     });
   } catch (err) {

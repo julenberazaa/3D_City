@@ -10,6 +10,7 @@ test("game boots and the car drives through the world", async ({ page }) => {
   await page.waitForFunction(() => (window as unknown as { __game?: unknown }).__game !== undefined);
 
   const hud = page.locator("#hud");
+  await page.keyboard.press("KeyH");
   await expect(hud).toContainText("buildings");
   await expect(hud).toContainText("roads");
 
