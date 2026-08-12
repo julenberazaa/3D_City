@@ -16,3 +16,4 @@ upstream/
 .env
 .env.*
 !.env.example
+intro_video/
