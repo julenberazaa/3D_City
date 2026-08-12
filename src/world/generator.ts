@@ -247,23 +247,22 @@ function emitRibbon(
     let d2 = normalize2(next[0] - pts[i]![0], next[1] - pts[i]![1]);
     if (!d1) d1 = d2;
     if (!d2) d2 = d1;
-    const n1: [number, number] = [-d1![1], d1![0]];
-    const n2b: [number, number] = [-d2![1], d2![0]];
-    void n2b;
+    const u1 = d1!;
+    const u2 = d2!;
+    const n1: [number, number] = [-u1[1], u1[0]];
     if (i === 0 || i === n - 1) {
       left.push([pts[i]![0] + n1[0] * half, pts[i]![1] + n1[1] * half]);
       right.push([pts[i]![0] - n1[0] * half, pts[i]![1] - n1[1] * half]);
       continue;
     }
     // Miter: intersection of the two offset lines lies on the bisector.
-    const cross = d1[0] * d2[1] - d1[1] * d2[0];
-    const dsum = Math.abs(d1[0] + d2[0]) + Math.abs(d1[1] + d2[1]);
+    const dsum = Math.abs(u1[0] + u2[0]) + Math.abs(u1[1] + u2[1]);
     let off = 0;
     if (dsum < 1e-6) {
       off = half;
     } else {
-      const bx = d1[0] + d2[0];
-      const bz = d1[1] + d2[1];
+      const bx = u1[0] + u2[0];
+      const bz = u1[1] + u2[1];
       const bl = Math.hypot(bx, bz);
       const bLx = -bz / bl;
       const bLz = bx / bl;
@@ -272,7 +271,6 @@ function emitRibbon(
     }
     const miter = Math.min(off, half * 1.5);
     const nL: [number, number] = [n1[0] * miter, n1[1] * miter];
-    void cross;
     left.push([pts[i]![0] + nL[0], pts[i]![1] + nL[1]]);
     right.push([pts[i]![0] - nL[0], pts[i]![1] - nL[1]]);
   }
