@@ -1,8 +1,6 @@
 import { chromium } from "@playwright/test";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = dirname(fileURLToPath(import.meta.url)) + "/../..";
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const BASE = process.env.BASE ?? "http://localhost:4173";
 const url = process.argv[2] ?? `${BASE}/?fixture=sf-downtown&benchmark=1&bench_seconds=20&bench_dist=500`;
