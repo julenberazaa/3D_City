@@ -315,6 +315,24 @@ async function boot(): Promise<void> {
     let latestWheels = 0;
     const status = "Ready";
 
+    // Elevated follow camera with exponential smoothing (game-feel R-021/R-028):
+    // higher than the street canyon, more road ahead, no snap jitter. Smoothing
+    // state resets on spawn/R so the view re-orients immediately.
+    const CAM_DIST = 22;
+    const CAM_HEIGHT = 15;
+    const CAM_LOOK_AHEAD = 20;
+    const CAM_LOOK_AHEAD_SPEED = 0.35; // extra look-ahead m per km/h
+    const camSmooth = new THREE.Vector3();
+    const lookSmooth = new THREE.Vector3();
+    let camInit = false;
+    const snapCamera = () => {
+      const fwd = vehicle.forward();
+      camSmooth.set(latestCarPos.x - fwd.x * CAM_DIST, latestCarPos.y + CAM_HEIGHT, latestCarPos.z - fwd.z * CAM_DIST);
+      lookSmooth.set(latestCarPos.x + fwd.x * CAM_LOOK_AHEAD, latestCarPos.y + 2.5, latestCarPos.z + fwd.z * CAM_LOOK_AHEAD);
+      camInit = true;
+    };
+    snapCamera();
+
     const resize = () => {
       render.resize(window.innerWidth, window.innerHeight);
       orbit.camera.aspect = window.innerWidth / window.innerHeight;

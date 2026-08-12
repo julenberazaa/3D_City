@@ -80,6 +80,8 @@ const WHEEL_POS: Array<[number, number, number]> = [
   [-1.55, -0.2, 1.35],
 ];
 const FRONT_WHEELS = [0, 1];
+/** Arcade top speed in m/s (~94 km/h). */
+const ARCADE_SPEED_CAP = 26;
 
 function quatFromHeading(heading: number): Quaternion {
   return {
@@ -129,11 +131,15 @@ export function createCar(world: RapierWorld, spawn: CarSpawn): Car {
     },
     update(dt) {
       const n = vehicle.numWheels();
+      const speed = Math.abs(vehicle.currentVehicleSpeed());
+      // Arcade speed limiter: engine force fades as the car approaches the cap
+      // (~26 m/s ≈ 94 km/h), giving a snappy but bounded top speed.
+      const forceScale = Math.max(0, Math.min(1, (ARCADE_SPEED_CAP - speed) / 8));
       for (let i = 0; i < n; i++) {
         vehicle.setWheelBrake(i, brake * 40);
         vehicle.setWheelSteering(i, FRONT_WHEELS.includes(i) ? steer * 0.55 : 0);
         // Calibrated empirically: positive engine force thrusts along -Z in rapier 0.20.
-        const force = FRONT_WHEELS.includes(i) ? throttle * -650 : throttle * -400;
+        const force = (FRONT_WHEELS.includes(i) ? throttle * -850 : throttle * -520) * forceScale;
         vehicle.setWheelEngineForce(i, force);
       }
       vehicle.updateVehicle(dt, undefined);

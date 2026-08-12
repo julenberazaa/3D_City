@@ -4,12 +4,28 @@ Authoritative visual requirement for 3D City (fidelity-recovery and beyond).
 Together with `NORTH_STAR.md`, `REQUIREMENTS.md` and `REAL_WORLD_FIDELITY_POLICY.md`,
 this document defines what the product must look like.
 
-Reference image: the owner-provided style reference (`docs/design/style-reference.png`,
-committed with this spec) is the VISUAL BENCHMARK for acceptance. It is a STYLE
-REFERENCE — a description of the target look — NOT a geographic source; no
-geometry, footprint, name or location may be copied from it. (Engineering model
-has no vision; Luna performs the visual comparison against the reference during
-acceptance.)
+## Primary style reference
+
+`docs/reference/objective_vista.png` (owner-provided, committed with this spec)
+is the PRIMARY STYLE REFERENCE and the visual benchmark for acceptance.
+
+IMPORTANT: it is a STYLE REFERENCE ONLY — a description of the target look.
+It is NOT a geographic truth source: no geometry, footprint, street layout,
+name or location may be copied from it. All geography must come from the
+real-world pipeline per `REAL_WORLD_FIDELITY_POLICY.md`.
+
+Target qualities derived from the reference image:
+- clean voxel/blocky miniature style (simple flat-shaded geometry);
+- Crossy-Road-like readability (clear silhouettes, strong color blocks);
+- elevated / isometric-like camera (more road ahead than behind);
+- legible roads and intersections (coherent widths, clean junctions);
+- road names rendered in a map-like readable style along the streets;
+- clear trees / greenery / water (stylized, truthful to real data);
+- simplified but recognizable real buildings (real footprint/massing/height);
+- polished miniature-city feel (game-first presentation, lightweight HUD).
+
+(Engineering model has no vision; Luna performs the visual comparison of
+candidate screenshots against this reference during acceptance.)
 
 ## Target look (owner-approved)
 
