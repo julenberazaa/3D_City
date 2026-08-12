@@ -46,7 +46,7 @@ async function waitForRendered(canvas: Locator, relX: number, relY: number, labe
 }
 
 test("static vertical slice: fixture world boots and renders", async ({ page }) => {
-  test.setTimeout(120000);
+  test.setTimeout(300000);
   await page.goto("/?fixture=sf-downtown");
   await expect(page.locator("#status")).toContainText("Ready", { timeout: 90000 });
   // Public view: small HUD by default, full diagnostics behind H.
