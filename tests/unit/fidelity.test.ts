@@ -107,7 +107,7 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
       ends.set(b, (ends.get(b) ?? 0) + 1);
     }
     let dangling = 0;
-    for (const [k, v] of ends) if (v === 1) dangling++;
+    for (const v of ends.values()) if (v === 1) dangling++;
     console.log(`endpoint degree-1 nodes: ${dangling} of ${ends.size}`);
     expect(dangling / Math.max(1, ends.size)).toBeLessThan(0.4);
   });
@@ -166,7 +166,7 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
     let anyAttr = 0;
     for (const c of fixture.buildings) {
       for (const f of c.features) {
-        if ((f as Record<string, unknown>).facadeColor || (f as Record<string, unknown>).roofColor || (f as Record<string, unknown>).subtype) anyAttr++;
+        if ((f as unknown as Record<string, unknown>).facadeColor || (f as unknown as Record<string, unknown>).roofColor || (f as unknown as Record<string, unknown>).subtype) anyAttr++;
       }
     }
     console.log(`buildings with ANY color/material/subtype attribute in fixture: ${anyAttr}`);
