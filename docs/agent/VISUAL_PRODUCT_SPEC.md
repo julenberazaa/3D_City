@@ -4,11 +4,12 @@ Authoritative visual requirement for 3D City (fidelity-recovery and beyond).
 Together with `NORTH_STAR.md`, `REQUIREMENTS.md` and `REAL_WORLD_FIDELITY_POLICY.md`,
 this document defines what the product must look like.
 
-Reference image: the owner-provided style reference (attached to the recovery
-brief) is the VISUAL BENCHMARK for acceptance. It is a STYLE REFERENCE — a
-description of the target look — NOT a geographic source; no geometry, footprint,
-name or location may be copied from it. (Engineering model has no vision; Luna
-performs the visual comparison against the reference during acceptance.)
+Reference image: the owner-provided style reference (`docs/design/style-reference.png`,
+committed with this spec) is the VISUAL BENCHMARK for acceptance. It is a STYLE
+REFERENCE — a description of the target look — NOT a geographic source; no
+geometry, footprint, name or location may be copied from it. (Engineering model
+has no vision; Luna performs the visual comparison against the reference during
+acceptance.)
 
 ## Target look (owner-approved)
 
