@@ -1,5 +1,4 @@
 import { chromium } from "@playwright/test";
-import { fileURLToPath } from "node:url";
 
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const BASE = process.env.BASE ?? "http://localhost:4173";
