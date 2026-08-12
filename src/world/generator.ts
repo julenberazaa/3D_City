@@ -248,6 +248,8 @@ function emitRibbon(
     if (!d1) d1 = d2;
     if (!d2) d2 = d1;
     const n1: [number, number] = [-d1![1], d1![0]];
+    const n2b: [number, number] = [-d2![1], d2![0]];
+    void n2b;
     if (i === 0 || i === n - 1) {
       left.push([pts[i]![0] + n1[0] * half, pts[i]![1] + n1[1] * half]);
       right.push([pts[i]![0] - n1[0] * half, pts[i]![1] - n1[1] * half]);
