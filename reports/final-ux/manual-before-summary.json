@@ -1,0 +1,51 @@
+{
+  "normal-town": {
+    "scenario": "normal-town",
+    "label": "Zurich (normal town)",
+    "error": "boot failed; status=Ready"
+  },
+  "dense-urban": {
+    "scenario": "dense-urban",
+    "label": "Manhattan (dense urban)",
+    "url": "http://localhost:4173/?bbox=-74.015,40.700,-73.960,40.735",
+    "drivenM": 503,
+    "durationS": 401,
+    "recoveries": 20,
+    "teleports": [],
+    "steeringEvents": 151,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 11.9,
+      "p99": 12.5
+    },
+    "severeStalls250ms": 14,
+    "longestFrameMs": 7143,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/before-dense-urban-spawn.png",
+      "reports/visual/final-ux/before-dense-urban-drive.png"
+    ]
+  },
+  "mountain": {
+    "scenario": "mountain",
+    "label": "Zermatt (mountainous)",
+    "url": "http://localhost:4173/?bbox=7.73,45.99,7.78,46.03",
+    "drivenM": 505,
+    "durationS": 96,
+    "recoveries": 1,
+    "teleports": [],
+    "steeringEvents": 55,
+    "fpsMedian": 164,
+    "frameMs": {
+      "p95": 6.4,
+      "p99": 6.6
+    },
+    "severeStalls250ms": 0,
+    "longestFrameMs": 67,
+    "consoleErrors": [],
+    "evidence": [
+      "reports/visual/final-ux/before-mountain-spawn.png",
+      "reports/visual/final-ux/before-mountain-drive.png"
+    ]
+  }
+}
