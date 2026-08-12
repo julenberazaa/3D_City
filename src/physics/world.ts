@@ -11,6 +11,8 @@ import { resolveBuilding, sampleTerrain } from "../world/generator";
 interface ColliderDescFactory {
   cuboid(hx: number, hy: number, hz: number): ColliderDesc;
   heightfield(nrows: number, ncols: number, heights: ArrayLike<number>, scale: { x: number; y: number; z: number }, flags?: number): ColliderDesc;
+  /** Not in the compat type defs for 0.20, but present at runtime; takes a flat xyz Float32Array. */
+  convexHull(points: Float32Array): ColliderDesc | null;
 }
 
 const descFactory = ColliderDesc as unknown as ColliderDescFactory;
@@ -62,11 +64,14 @@ function buildingAabbs(fixture: WorldFixture): Aabb[] {
   return out;
 }
 
+const NON_VEHICULAR_CLASSES = new Set(["footway", "path", "steps", "pedestrian", "cycleway", "track"]);
+
 /**
- * Choose a playable spawn: nearest road feature to (0,0) whose point AND the
- * point 12 m ahead along the road are clear of building footprints and water
- * (margins). Oriented along the road direction; base height from terrain.
- * Falls back to the nearest road point.
+ * Choose a playable spawn: nearest DRIVABLE road feature to the target whose
+ * point AND the point 12 m ahead are clear of building footprints and water
+ * (margins), preferring connector-connected junctions (degree >=2) so the car
+ * never spawns on a dangling footway stub. Oriented along the road direction;
+ * base height from terrain. Falls back to the nearest drivable road point.
  */
 export function findSpawnPoint(
   roads: ChunkRecord[],
@@ -110,19 +115,38 @@ export function findSpawnPoint(
     return true;
   };
 
-  const candidates: Array<{ x: number; z: number; heading: number; dist: number }> = [];
+  const candidates: Array<{ x: number; z: number; heading: number; dist: number; connected: boolean }> = [];
   const originX = near?.x ?? 0;
   const originZ = near?.z ?? 0;
+  // Connector connectivity: how many features reference each connector id.
+  const connectorDegree = new Map<string, number>();
+  for (const c of roads) {
+    for (const f of c.features) {
+      for (const conn of f.connectors ?? []) {
+        connectorDegree.set(conn.id, (connectorDegree.get(conn.id) ?? 0) + 1);
+      }
+    }
+  }
   for (const c of roads) {
     for (const f of c.features) {
       const line = f.line;
       if (!line || line.length < 2) continue;
+      if (NON_VEHICULAR_CLASSES.has(f.class ?? "")) continue;
       const [ax, az] = line[0];
+      // Connected = the start endpoint is a junction shared by >=2 roads.
+      let connected = false;
+      for (const conn of f.connectors ?? []) {
+        if (conn.at <= 0.5 && (connectorDegree.get(conn.id) ?? 0) >= 2) {
+          connected = true;
+          break;
+        }
+      }
       candidates.push({
         x: ax,
         z: az,
         heading: Math.atan2(line[1][0] - ax, line[1][1] - az),
         dist: Math.hypot(ax - originX, az - originZ),
+        connected,
       });
     }
   }
@@ -168,7 +192,7 @@ export function findSpawnPoint(
   const scored = candidates
     .filter((c) => tryCandidate(c) !== null)
     .map((c) => ({ ...c, run: clearRunOf(c) }));
-  scored.sort((a, b) => b.run - a.run || a.dist - b.dist);
+  scored.sort((a, b) => (b.connected ? 1 : 0) - (a.connected ? 1 : 0) || b.run - a.run || a.dist - b.dist);
   if (scored.length > 0) return tryCandidate(scored[0])!;
 
   for (const cand of candidates.slice(0, 2000)) {
@@ -268,6 +292,114 @@ function buildingBoxFor(
   return world.createCollider(desc, b);
 }
 
+/** Andrew monotone chain 2D convex hull (deterministic). Returns hull in CW order. */
+export function convexHull2D(points: Array<[number, number]>): Array<[number, number]> {
+  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (pts.length < 3) return pts;
+  const cross = (o: [number, number], a: [number, number], b: [number, number]): number =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: Array<[number, number]> = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Array<[number, number]> = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+/** 2D polygon area (shoelace, absolute). */
+export function ringArea2D(pts: Array<[number, number]>): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(a / 2);
+}
+
+/**
+ * Hull points for a building collider: the footprint ring (decimated <=48 pts)
+ * extruded to [baseY, baseY+height]. Concave footprints get their convex hull —
+ * far closer to the visible shape than an AABB (no street-overhang corners).
+ */
+export function buildingHullPoints(
+  ring: number[][],
+  baseY: number,
+  height: number,
+  maxVerts = 48,
+): Array<[number, number, number]> {
+  const step = Math.max(1, Math.ceil(ring.length / maxVerts));
+  const sampled: Array<[number, number]> = [];
+  for (let i = 0; i < ring.length; i += step) {
+    const p = ring[i]!;
+    sampled.push([p[0], p[1]]);
+  }
+  const hull = convexHull2D(sampled);
+  const out: Array<[number, number, number]> = [];
+  for (const [x, z] of hull) {
+    out.push([x, baseY, z]);
+  }
+  for (const [x, z] of hull) {
+    out.push([x, baseY + height, z]);
+  }
+  return out;
+}
+
+function buildingHullFor(
+  world: RapierWorld,
+  terrain: ChunkTerrain[],
+  ring: number[][],
+  height: number,
+  body?: RapierBody,
+): Collider | null {
+  let baseY = -Infinity;
+  for (const p of ring) {
+    baseY = Math.max(baseY, sampleTerrain(terrain, p[0], p[1]));
+  }
+  const pts = buildingHullPoints(ring, baseY, height);
+  if (pts.length < 4) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const p of pts) {
+    minX = Math.min(minX, p[0]);
+    maxX = Math.max(maxX, p[0]);
+    minZ = Math.min(minZ, p[2]);
+    maxZ = Math.max(maxZ, p[2]);
+  }
+  if (maxX - minX < 0.6 || maxZ - minZ < 0.6) return null;
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  const cy = baseY + height / 2;
+  const b = body ?? world.createRigidBody(RigidBodyDesc.fixed().setTranslation(cx, cy, cz));
+  b.setTranslation({ x: cx, y: cy, z: cz }, true);
+  // Translate to body-local coordinates (hull points are world-local) and
+  // flatten to a Float32Array (the compat wrapper's expected layout).
+  const local = new Float32Array(pts.length * 3);
+  for (let i = 0; i < pts.length; i++) {
+    local[i * 3] = pts[i]![0] - cx;
+    local[i * 3 + 1] = pts[i]![1] - cy;
+    local[i * 3 + 2] = pts[i]![2] - cz;
+  }
+  const desc = descFactory.convexHull(local);
+  if (!desc) {
+    // Hull failure (degenerate input): fall back to the AABB box.
+    return buildingBoxFor(world, terrain, ring, height, b);
+  }
+  desc.setFriction(0.35);
+  desc.setRestitution(0.0);
+  return world.createCollider(desc, b);
+}
+
 export interface PhysicsChunkHandle {
   key: string;
   bodies: RapierBody[];
@@ -306,7 +438,7 @@ export function createPhysicsChunk(pw: PhysicsWorld, key: string): PhysicsChunkH
       const built = resolveBuilding(f, parts);
       if (!built) continue;
       const body = pw.world.createRigidBody(RigidBodyDesc.fixed());
-      const collider = buildingBoxFor(pw.world, pw.fixture.terrain, built.ring, built.height, body);
+      const collider = buildingHullFor(pw.world, pw.fixture.terrain, built.ring, built.height, body);
       if (collider) {
         bodies.push(body);
         buildings++;
@@ -366,7 +498,7 @@ export function createPhysicsWorld(fixture: WorldFixture): PhysicsWorld {
         stats.skipped++;
         continue;
       }
-      const collider = buildingBoxFor(world, fixture.terrain, built.ring, built.height);
+      const collider = buildingHullFor(world, fixture.terrain, built.ring, built.height);
       if (!collider) {
         stats.skipped++;
         continue;

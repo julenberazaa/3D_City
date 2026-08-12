@@ -8,6 +8,7 @@ import { createPhysicsWorld, createStreamingPhysicsWorld, createPhysicsChunk, fi
 import { createCar } from "../../src/physics/vehicle";
 import { chunkKeyOf, chunkCenter } from "../../src/stream/chunkManager";
 import type { ChunkTerrain, WorldFixture } from "../../src/world/generator";
+import { sampleTerrain } from "../../src/world/generator";
 import { readFixture } from "./fixture-helper";
 
 let fixture: WorldFixture;
@@ -181,11 +182,13 @@ describe("physics world (rapier)", () => {
     const pw = createPhysicsWorld(fixture);
     pw.world.step();
     let hitRoof = 0;
+    // Robust for both AABB and hull colliders (halfExtents is null on hulls):
+    // a hit counts as a building roof when it is clearly above the terrain.
     for (const b of pw.buildingColliders.slice(0, 200)) {
       const t = b.translation();
       const h = raycastHeight(pw.world, t.x, t.z);
-      const he = b.halfExtents();
-      if (he !== null && h !== null && h > t.y + he.y - 1) hitRoof++;
+      const ground = sampleTerrain(fixture.terrain, t.x, t.z);
+      if (h !== null && h > ground + 1) hitRoof++;
     }
     expect(hitRoof).toBeGreaterThan(150);
   });

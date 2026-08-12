@@ -5,7 +5,9 @@ import { join, dirname } from "node:path";
 import type { WorldFixture, FixtureFeature } from "../../src/world/generator";
 import { resolveBuilding, sampleTerrain } from "../../src/world/generator";
 import { prepareFixture } from "../../src/geo/fusion";
-import { findSpawnPoint } from "../../src/physics/world";
+import { findSpawnPoint, convexHull2D, ringArea2D } from "../../src/physics/world";
+
+const requireHullHelpers = () => ({ convexHull2D, ringArea2D });
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const json = (p: string) => JSON.parse(readFileSync(join(ROOT, p), "utf8"));
@@ -30,7 +32,8 @@ function distToSeg(px: number, pz: number, ax: number, az: number, bx: number, b
   return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
 }
 
-function minDistToRoads(x: number, z: number): number {
+function minDistToRoads(x: number, z: number, grid?: RoadGrid): number {
+  if (grid) return grid.minDist(x, z);
   let best = Infinity;
   for (const line of allRoadLines) {
     for (let i = 0; i < line.length - 1; i++) {
@@ -39,6 +42,53 @@ function minDistToRoads(x: number, z: number): number {
     }
   }
   return best;
+}
+
+/** Spatial index over road segments: cell 64 m, query point → neighbor cells. */
+class RoadGrid {
+  private cells = new Map<number, Array<{ ax: number; az: number; bx: number; bz: number }>>();
+  private readonly size = 64;
+  private readonly key = (cx: number, cz: number) => cx * 100000 + cz;
+
+  constructor(lines: number[][][]) {
+    for (const line of lines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const ax = line[i][0];
+        const az = line[i][1];
+        const bx = line[i + 1][0];
+        const bz = line[i + 1][1];
+        const minX = Math.min(ax, bx);
+        const maxX = Math.max(ax, bx);
+        const minZ = Math.min(az, bz);
+        const maxZ = Math.max(az, bz);
+        for (let cx = Math.floor(minX / this.size); cx <= Math.floor(maxX / this.size); cx++) {
+          for (let cz = Math.floor(minZ / this.size); cz <= Math.floor(maxZ / this.size); cz++) {
+            const k = this.key(cx, cz);
+            const list = this.cells.get(k);
+            if (list) list.push({ ax, az, bx, bz });
+            else this.cells.set(k, [{ ax, az, bx, bz }]);
+          }
+        }
+      }
+    }
+  }
+
+  minDist(x: number, z: number): number {
+    let best = Infinity;
+    const cx = Math.floor(x / this.size);
+    const cz = Math.floor(z / this.size);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = this.cells.get(this.key(cx + dx, cz + dz));
+        if (!list) continue;
+        for (const s of list) {
+          const d = distToSeg(x, z, s.ax, s.az, s.bx, s.bz);
+          if (d < best) best = d;
+        }
+      }
+    }
+    return best;
+  }
 }
 
 function aabbOf(ring: number[][]): { minX: number; maxX: number; minZ: number; maxZ: number } {
@@ -50,20 +100,9 @@ function aabbOf(ring: number[][]): { minX: number; maxX: number; minZ: number; m
   return { minX, maxX, minZ, maxZ };
 }
 
-function ringArea(pts: number[][]): number {
-  let a = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const q = pts[(i + 1) % pts.length];
-    a += p[0] * q[1] - q[0] * p[1];
-  }
-  return Math.abs(a / 2);
-}
-
-const ringAreaOf = (f: FixtureFeature): number => ringArea((f.ring ?? []).slice(0, -1).length >= 3 ? (f.ring ?? []).slice(0, -1) : (f.ring ?? []));
-
 describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", () => {
   let buildings: Array<{ f: FixtureFeature; ring: number[][]; height: number; provenance: string; roof?: string; aabb: { minX: number; maxX: number; minZ: number; maxZ: number } }>;
+  let roadGrid: RoadGrid;
 
   beforeAll(() => {
     buildings = [];
@@ -85,6 +124,7 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
         buildings.push({ f, ring: built.ring, height: built.height, provenance: built.provenance, roof: built.roof, aabb: aabbOf(built.ring) });
       }
     }
+    roadGrid = new RoadGrid(allRoadLines);
   });
 
   it("ROAD-01 rendered road surface is predominantly drivable (not footpaths)", () => {
@@ -169,25 +209,31 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
     expect(bad).toBeLessThan(buildings.length * 0.1);
   });
 
-  it("B-02 physics box vs visual footprint: bounded invisible-collision area", () => {
-    let badRatio = 0;
+  it("B-02 physics hull vs visual footprint: tight invisible-collision area", () => {
+    // The collider is a convex hull of the footprint (≤48 pts), so the ratio
+    // of the footprint area to the hull area is ~1 for convex shapes and close
+    // to 1 for mildly concave ones (AABB ratio was median 0.67 / 58% <0.7).
+    const { convexHull2D, ringArea2D } = requireHullHelpers();
+    let bad = 0;
     const ratios: number[] = [];
     for (const b of buildings) {
-      const ringArea = ringAreaOf(b.f);
-      const boxArea = (b.aabb.maxX - b.aabb.minX) * (b.aabb.maxZ - b.aabb.minZ);
-      const ratio = boxArea > 0 ? ringArea / boxArea : 1;
+      const ringPts: Array<[number, number]> = b.ring.map((p) => [p[0], p[1]]);
+      const ringArea = ringArea2D(ringPts);
+      if (ringArea <= 0) continue;
+      const hullArea = ringArea2D(convexHull2D(ringPts));
+      const ratio = hullArea > 0 ? ringArea / hullArea : 1;
       ratios.push(ratio);
-      if (ratio < 0.7) badRatio++;
+      if (ratio < 0.75) bad++;
     }
     ratios.sort((a, b) => a - b);
-    console.log(`box/ring area ratio p10=${ratios[Math.floor(ratios.length * 0.1)]!.toFixed(2)} median=${ratios[Math.floor(ratios.length * 0.5)]!.toFixed(2)}; boxes with <0.7 coverage: ${badRatio}/${buildings.length}`);
-    expect(badRatio / buildings.length).toBeLessThan(0.15);
+    console.log(`footprint/hull ratio p10=${ratios[Math.floor(ratios.length * 0.1)]!.toFixed(3)} median=${ratios[Math.floor(ratios.length * 0.5)]!.toFixed(3)}; hulls with <0.75 coverage: ${bad}/${ratios.length}`);
+    expect(bad / Math.max(1, ratios.length)).toBeLessThan(0.15);
   });
 
   it("B-03 buildings sit close to a real road (adjacent, not isolated)", () => {
     let far = 0;
     for (const b of buildings) {
-      const d = minDistToRoads(b.aabb.minX, b.aabb.minZ);
+      const d = minDistToRoads(b.aabb.minX, b.aabb.minZ, roadGrid);
       if (d > 60) far++;
     }
     console.log(`buildings >60m from nearest road: ${far}/${buildings.length}`);
@@ -215,7 +261,7 @@ describe("FIDELITY: objective geometry/quality metrics (sf-downtown fixture)", (
 
   it("SPAWN-01 spawn picks a genuinely drivable, connected road", () => {
     const spawn = findSpawnPoint(fixture.roads, fixture.terrain, fixture);
-    const d = minDistToRoads(spawn.x, spawn.z);
+    const d = minDistToRoads(spawn.x, spawn.z, roadGrid);
     const nearest = allRoads.map((f) => ({
       f,
       d: Math.min(
