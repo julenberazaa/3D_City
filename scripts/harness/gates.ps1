@@ -23,8 +23,8 @@ function Test-Gate01RepoIntegrity {
   if ($remote -ne "https://github.com/julenberazaa/3D_City.git") {
     return @{ Status = "FAIL"; Detail = "remote mismatch: $remote" }
   }
-  if ($branch -ne "main" -and -not ($branch -like "final-*" -and $branch -like "*hardening*")) {
-    return @{ Status = "FAIL"; Detail = "branch $branch (expected main or a final-hardening branch)" }
+  if ($branch -ne "main" -and -not ($branch -like "final-*" -and $branch -like "*hardening*") -and $branch -ne "fidelity-recovery") {
+    return @{ Status = "FAIL"; Detail = "branch $branch (expected main, a final-*hardening* branch, or fidelity-recovery)" }
   }
   $note = if ($dirty) { "dirty files: $($dirty -join '; ')" } else { "clean" }
   return @{ Status = "PASS"; Detail = "remote OK, main, $note" }

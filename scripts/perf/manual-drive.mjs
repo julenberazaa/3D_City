@@ -63,7 +63,7 @@ async function runScenario(browser, name, cfg, tag) {
   await page.waitForTimeout(1200);
   await page.screenshot({ path: join(SHOT_DIR, `${tag}-${name}-spawn.png`) });
 
-  const stats = await page.evaluate(() => {
+  await page.evaluate(() => {
     const dts = [];
     let last = performance.now();
     const loop = (t) => {
@@ -83,7 +83,6 @@ async function runScenario(browser, name, cfg, tag) {
         return { fpsMedian: 1000 / p(0.5), p95: p(0.95), p99: p(0.99), severe, longest, n: s.length };
       },
     };
-    return {};
   });
 
   const t0 = Date.now();
