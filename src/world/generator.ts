@@ -236,6 +236,7 @@ function emitRibbon(
   yAt: (x: number, z: number, i: number) => number,
   color: number[],
   bridgeY: (x: number, z: number) => number | null,
+  yOffset = 0,
 ): void {
   const n = pts.length;
   if (n < 2) return;
@@ -244,40 +245,16 @@ function emitRibbon(
   for (let i = 0; i < n; i++) {
     const prev = pts[Math.max(0, i - 1)]!;
     const next = pts[Math.min(n - 1, i + 1)]!;
-    let d1 = normalize2(pts[i]![0] - prev[0], pts[i]![1] - prev[1]);
-    let d2 = normalize2(next[0] - pts[i]![0], next[1] - pts[i]![1]);
-    if (!d1) d1 = d2;
-    if (!d2) d2 = d1;
-    const u1 = d1!;
-    const u2 = d2!;
-    const n1: [number, number] = [-u1[1], u1[0]];
-    if (i === 0 || i === n - 1) {
-      left.push([pts[i]![0] + n1[0] * half, pts[i]![1] + n1[1] * half]);
-      right.push([pts[i]![0] - n1[0] * half, pts[i]![1] - n1[1] * half]);
-      continue;
-    }
-    // Miter: intersection of the two offset lines lies on the bisector.
-    const dsum = Math.abs(u1[0] + u2[0]) + Math.abs(u1[1] + u2[1]);
-    let off = 0;
-    if (dsum < 1e-6) {
-      off = half;
-    } else {
-      const bx = u1[0] + u2[0];
-      const bz = u1[1] + u2[1];
-      const bl = Math.hypot(bx, bz);
-      const bLx = -bz / bl;
-      const bLz = bx / bl;
-      const s = Math.abs(n1[0] * bLx + n1[1] * bLz);
-      off = s > 0.25 ? half / s : half;
-    }
-    const miter = Math.min(off, half * 1.5);
-    const nL: [number, number] = [n1[0] * miter, n1[1] * miter];
-    left.push([pts[i]![0] + nL[0], pts[i]![1] + nL[1]]);
-    right.push([pts[i]![0] - nL[0], pts[i]![1] - nL[1]]);
+    // Smoothed direction (prev→next): proven to keep quad ordering on sharp
+    // turns; mitered incoming-direction offsets twisted quads at hairpins.
+    const d = normalize2(next[0] - prev[0], next[1] - prev[1]) ?? [1, 0];
+    const n1: [number, number] = [-d[1], d[0]];
+    left.push([pts[i]![0] + n1[0] * half, pts[i]![1] + n1[1] * half]);
+    right.push([pts[i]![0] - n1[0] * half, pts[i]![1] - n1[1] * half]);
   }
   for (let i = 0; i < n - 1; i++) {
-    const yA = bridgeY(pts[i]![0], pts[i]![1]) ?? yAt(pts[i]![0], pts[i]![1], i);
-    const yB = bridgeY(pts[i + 1]![0], pts[i + 1]![1]) ?? yAt(pts[i + 1]![0], pts[i + 1]![1], i + 1);
+    const yA = (bridgeY(pts[i]![0], pts[i]![1]) ?? yAt(pts[i]![0], pts[i]![1], i)) + yOffset;
+    const yB = (bridgeY(pts[i + 1]![0], pts[i + 1]![1]) ?? yAt(pts[i + 1]![0], pts[i + 1]![1], i + 1)) + yOffset;
     const a = vb.add(left[i]![0], yA, left[i]![1], color[0], color[1], color[2]);
     const b2 = vb.add(right[i]![0], yA, right[i]![1], color[0], color[1], color[2]);
     const c2 = vb.add(left[i + 1]![0], yB, left[i + 1]![1], color[0], color[1], color[2]);
@@ -552,7 +529,7 @@ function buildWaterChunkMesh(c: ChunkRecord): { mesh: THREE.Mesh | null; count: 
       vb.tri(idx[0], idx[1], idx[2]);
     }
     // Shoreline ring: darker inward strip that separates water from land.
-    emitRibbon(vb, pts, 0.55, () => WATER_LEVEL - 0.06, SHORE, () => null);
+    emitRibbon(vb, pts, 0.55, () => WATER_LEVEL - 0.06, SHORE, () => null, -0.03);
   }
   return { mesh: vb.toMesh(WATER_MATERIAL), count };
 }
@@ -565,7 +542,7 @@ function buildLandcoverChunkMesh(c: ChunkRecord, terrain: ChunkTerrain[]): { mes
     const pts = decimateRing(distinctPoints(f.ring));
     if (pts.length < 3 || ringArea(pts) < 0.5) continue;
     const [cx, cy] = centroid(pts);
-    const y = sampleTerrain(terrain, cx, cy) + 0.05;
+    const y = sampleTerrain(terrain, cx, cy) + 0.03;
     let color: number[];
     if (f.class === "grass") color = [0.36, 0.58, 0.26];
     else if (f.class === "forest") color = [0.22, 0.4, 0.19];
@@ -619,7 +596,12 @@ function buildRoadChunkMesh(
   const vb = new VertexBuilder();
   let count = 0;
 
-  const yAt = (x: number, z: number): number => sampleTerrain(terrain, x, z) + 0.06;
+  // Elevation layering (all offsets relative to terrain): curb pass rides at
+  // +0.06, the surface pass and junction caps at +0.08 — separate planes so
+  // the two coplanar passes never z-fight.
+  const CURB_Y = 0.06;
+  const SURFACE_Y = 0.08;
+  const yAt = (x: number, z: number): number => sampleTerrain(terrain, x, z);
   const bridgeY = (x: number, z: number): number | null =>
     waterRings.some((ring) => pointInRing(x, z, ring)) ? WATER_LEVEL + 0.3 : null;
 
@@ -632,6 +614,7 @@ function buildRoadChunkMesh(
     connectors?: Array<{ id: string; at: number }>;
   }
   const segs: Seg[] = [];
+  let anyConnectors = false;
   for (const f of c.features) {
     if (!f.line || f.line.length < 2) continue;
     const pts: number[][] = [];
@@ -640,6 +623,7 @@ function buildRoadChunkMesh(
       if (!last || last[0] !== p[0] || last[1] !== p[1]) pts.push(p);
     }
     if (pts.length < 2) continue;
+    if (f.connectors && f.connectors.length > 0) anyConnectors = true;
     const vehicular = !NON_VEHICULAR_CLASSES.has(f.class ?? "");
     segs.push({
       f,
@@ -650,41 +634,82 @@ function buildRoadChunkMesh(
     });
   }
 
-  // Junction graph from connector ids (Overture junction topology).
+  // Junction graph: connector ids (Overture topology) when present; otherwise
+  // pseudo-junctions from shared endpoints (legacy/connector-less fixtures).
   const junctions = new Map<string, RoadJunction>();
+  const addJunction = (id: string, x: number, z: number, seg: Seg): void => {
+    let j = junctions.get(id);
+    if (!j) {
+      j = { x, z, radius: 0, features: [] };
+      junctions.set(id, j);
+    }
+    j.features.push({ f: seg.f, width: seg.width });
+    j.radius = Math.max(j.radius, seg.width / 2);
+  };
   for (const s of segs) {
     for (const conn of s.connectors ?? []) {
-      let j = junctions.get(conn.id);
-      if (!j) {
-        const pos = conn.at <= 0.5 ? s.pts[0]! : s.pts[s.pts.length - 1]!;
-        j = { x: pos[0], z: pos[1], radius: 0, features: [] };
-        junctions.set(conn.id, j);
+      const pos = conn.at <= 0.5 ? s.pts[0]! : s.pts[s.pts.length - 1]!;
+      addJunction(conn.id, pos[0], pos[1], s);
+    }
+  }
+  if (!anyConnectors) {
+    // Endpoint clustering: segments sharing an endpoint (within 0.75 m) form
+    // a junction — same topology the connectors would have given.
+    const byEnd = new Map<string, Array<{ seg: Seg; atStart: boolean }>>();
+    const key = (x: number, z: number) => `${Math.round(x / 0.75)}:${Math.round(z / 0.75)}`;
+    for (const s of segs) {
+      const a = s.pts[0]!;
+      const b = s.pts[s.pts.length - 1]!;
+      const ka = key(a[0], a[1]);
+      const kb = key(b[0], b[1]);
+      const la = byEnd.get(ka) ?? [];
+      la.push({ seg: s, atStart: true });
+      byEnd.set(ka, la);
+      const lb = byEnd.get(kb) ?? [];
+      lb.push({ seg: s, atStart: false });
+      byEnd.set(kb, lb);
+    }
+    let pseudo = 0;
+    for (const [, list] of byEnd) {
+      if (list.length < 2) continue;
+      const { seg } = list[0]!;
+      const pos = list[0]!.atStart ? seg.pts[0]! : seg.pts[seg.pts.length - 1]!;
+      for (const item of list) {
+        const p = item.atStart ? item.seg.pts[0]! : item.seg.pts[item.seg.pts.length - 1]!;
+        addJunction(`pseudo:${pseudo}:${Math.round(p[0])}:${Math.round(p[1])}`, pos[0], pos[1], item.seg);
       }
-      j.features.push({ f: s.f, width: s.width });
-      j.radius = Math.max(j.radius, s.width / 2);
+      pseudo++;
     }
   }
 
-  // Trim ribbons to their junction radii and emit passes.
+  // Trim ribbons to their junction radii (clamped so short segments between
+  // junctions never vanish) and emit passes.
+  const segLen = (pts: number[][]): number => {
+    let len = 0;
+    for (let i = 0; i < pts.length - 1; i++) len += Math.hypot(pts[i + 1]![0] - pts[i]![0], pts[i + 1]![1] - pts[i]![1]);
+    return len;
+  };
   for (const s of segs) {
     let pts = s.pts;
+    const totalLen = segLen(s.pts);
     for (const conn of s.connectors ?? []) {
       const j = junctions.get(conn.id);
-      if (!j) continue;
-      if (j.features.length >= 2) {
-        pts = trimToRadius(pts, conn.at <= 0.5, j.radius + (s.vehicular ? 0 : 0.2));
-      }
+      if (!j || j.features.length < 2) continue;
+      const fromStart = conn.at <= 0.5;
+      const budget = Math.max(0, (totalLen - 1.5) / 2);
+      const radius = Math.min(j.radius + (s.vehicular ? 0 : 0.2), budget);
+      if (radius > 0) pts = trimToRadius(pts, fromStart, radius);
     }
     if (pts.length < 2) continue;
     const clsVar = (fnv1a(s.f.class ?? "") % 3 - 1) * 0.015;
     if (s.vehicular) {
       const surface: number[] = [ROAD_SURFACE[0] + clsVar, ROAD_SURFACE[1] + clsVar, ROAD_SURFACE[2] + clsVar];
       const inset = Math.min(CURB_INSET, s.width / 4);
-      emitRibbon(vb, pts, s.width / 2, yAt, CURB_COLOR, bridgeY);
-      emitRibbon(vb, pts, s.width / 2 - inset, yAt, surface, bridgeY);
+      emitRibbon(vb, pts, s.width / 2, yAt, CURB_COLOR, bridgeY, CURB_Y);
+      emitRibbon(vb, pts, s.width / 2 - inset, yAt, surface, bridgeY, SURFACE_Y);
     } else {
       const path: number[] = [PATH_COLOR[0] + clsVar, PATH_COLOR[1] + clsVar, PATH_COLOR[2] + clsVar];
-      emitRibbon(vb, pts, s.width / 2, yAt, path, bridgeY);
+      emitRibbon(vb, pts, s.width / 2, yAt, path, bridgeY, CURB_Y);
     }
     count++;
   }
@@ -694,7 +719,7 @@ function buildRoadChunkMesh(
   for (const j of junctions.values()) {
     if (j.features.length < 2) continue;
     const N = 10;
-    const y = bridgeY(j.x, j.z) ?? yAt(j.x, j.z);
+    const y = (bridgeY(j.x, j.z) ?? yAt(j.x, j.z)) + SURFACE_Y;
     for (let k = 0; k < N; k++) {
       const a0 = (2 * Math.PI * k) / N;
       const a1 = (2 * Math.PI * (k + 1)) / N;
@@ -703,7 +728,10 @@ function buildRoadChunkMesh(
       const va = vb.add(p0[0], y, p0[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
       const vc = vb.add(p1[0], y, p1[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
       const vctr = vb.add(j.x, y, j.z, ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
-      vb.tri(vctr, va, vc);
+      // Winding guard (same convention as ribbons): fan must face up.
+      const ny = (p1[0] - j.x) * (p0[1] - j.z) - (p1[1] - j.z) * (p0[0] - j.x);
+      if (ny >= 0) vb.tri(vctr, va, vc);
+      else vb.tri(vctr, vc, va);
     }
     count++;
   }

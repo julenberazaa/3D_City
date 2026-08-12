@@ -19,14 +19,14 @@ export function createCarVisual(): CarVisual {
   const group = new THREE.Group();
 
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(3.4, 0.8, 5.0),
+    new THREE.BoxGeometry(2.0, 0.78, 4.4),
     new THREE.MeshLambertMaterial({ color: BODY_COLOR }),
   );
   body.position.y = 0.5;
   group.add(body);
 
   const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(2.0, 0.55, 2.4),
+    new THREE.BoxGeometry(1.6, 0.52, 2.2),
     new THREE.MeshLambertMaterial({ color: CABIN_COLOR }),
   );
   cabin.position.set(0, 1.05, -0.25);
@@ -35,20 +35,20 @@ export function createCarVisual(): CarVisual {
   // Windshield facet: dark glass strip on the cabin front (+Z), gives the car
   // an immediate heading cue at a glance.
   const windshield = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, 0.42, 0.12),
+    new THREE.BoxGeometry(1.35, 0.4, 0.1),
     new THREE.MeshLambertMaterial({ color: WINDSHIELD_COLOR }),
   );
-  windshield.position.set(0, 1.12, 0.95);
+  windshield.position.set(0, 1.1, 0.9);
   group.add(windshield);
 
   const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 12);
   wheelGeo.rotateZ(Math.PI / 2);
   const wheelMat = new THREE.MeshLambertMaterial({ color: WHEEL_COLOR });
   for (const [x, z] of [
-    [1.45, 1.45],
-    [-1.45, 1.45],
-    [1.45, -1.45],
-    [-1.45, -1.45],
+    [0.95, 1.35],
+    [-0.95, 1.35],
+    [0.95, -1.35],
+    [-0.95, -1.35],
   ]) {
     const wheel = new THREE.Mesh(wheelGeo, wheelMat);
     wheel.position.set(x, WHEEL_RADIUS, z);
