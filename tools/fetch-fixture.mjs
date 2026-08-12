@@ -69,7 +69,22 @@ async function fetchLayerFeatures(theme, tiles, layer) {
     }
     for (const f of l.features) {
       if (f.type === "Polygon") {
-        if (f.geometry.length) out.push({ tile: t, extent: l.extent, ring: f.geometry[0], props: f.properties });
+        if (f.geometry.length) {
+          let best = f.geometry[0];
+          let bestArea = -1;
+          for (const ring of f.geometry) {
+            let a = 0;
+            for (let i = 0; i < ring.length - 1; i++) {
+              a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+            }
+            a = Math.abs(a / 2);
+            if (a > bestArea) {
+              bestArea = a;
+              best = ring;
+            }
+          }
+          out.push({ tile: t, extent: l.extent, ring: best, props: f.properties });
+        }
       } else if (f.type === "LineString") {
         const lines = f.geometry;
         if (!lines.length) continue;

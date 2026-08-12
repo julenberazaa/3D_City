@@ -19,7 +19,7 @@ describe("deterministic chunk keys (R-009)", () => {
       chunkKey(15, 5241, 12663, "2026-08-22.0", GEN_VERSION, ART_VERSION),
     );
     expect(chunkKey(15, 5241, 12663, RELEASE, GEN_VERSION, ART_VERSION)).not.toBe(
-      chunkKey(15, 5241, 12663, RELEASE, "g3", ART_VERSION),
+      chunkKey(15, 5241, 12663, RELEASE, `${GEN_VERSION}-next`, ART_VERSION),
     );
   });
 

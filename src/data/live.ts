@@ -124,7 +124,24 @@ async function fetchLayerFeatures(theme: string, tiles: Array<{ z: number; x: nu
     if (!l) continue;
     for (const f of l.features) {
       if (f.type === "Polygon") {
-        if (f.geometry.length) out.push({ tile: t, extent: l.extent, ring: f.geometry[0] as number[][], props: f.properties });
+        if (f.geometry.length) {
+          // Multi-ring features (holes/disjoint parts): keep the largest ring as
+          // the footprint; inner rings are holes of the same building.
+          let best = f.geometry[0] as number[][];
+          let bestArea = -1;
+          for (const ring of f.geometry as number[][][]) {
+            let a = 0;
+            for (let i = 0; i < ring.length - 1; i++) {
+              a += ring[i]![0]! * ring[i + 1]![1]! - ring[i + 1]![0]! * ring[i]![1]!;
+            }
+            a = Math.abs(a / 2);
+            if (a > bestArea) {
+              bestArea = a;
+              best = ring;
+            }
+          }
+          out.push({ tile: t, extent: l.extent, ring: best, props: f.properties });
+        }
       } else if (f.type === "LineString") {
         const lines = f.geometry as number[][][];
         if (!lines.length) continue;

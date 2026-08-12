@@ -13,6 +13,20 @@ export interface FixtureFeature {
   partOf?: string;
   class?: string;
   surface?: string;
+  /** Overture building subtype (residential, commercial, civic, …). */
+  subtype?: string;
+  /** OBSERVED facade/roof style from Overture (hex or material name). */
+  facadeColor?: string;
+  facadeMaterial?: string;
+  roofColor?: string;
+  roofMaterial?: string;
+  roofHeight?: number;
+  roofOrientation?: string;
+  name?: string;
+  minHeight?: number;
+  level?: number;
+  /** Junction topology: connector refs with fractional position along the line. */
+  connectors?: Array<{ id: string; at: number }>;
 }
 
 export interface ChunkRecord {

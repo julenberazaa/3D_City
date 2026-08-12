@@ -161,6 +161,40 @@ export function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
+/** Overture `names` is a JSON string like {"primary":"X","common":"Y"}; fallback to @name. */
+export function primaryName(props: Record<string, unknown>): string | undefined {
+  const raw = props.names;
+  if (typeof raw === "string" && raw) {
+    try {
+      const parsed = JSON.parse(raw) as { primary?: string };
+      if (typeof parsed.primary === "string" && parsed.primary) return parsed.primary;
+    } catch {
+      /* malformed names JSON: fall through */
+    }
+  }
+  const at = props["@name"];
+  return typeof at === "string" && at ? at : undefined;
+}
+
+/** Overture `connectors` is a JSON array of {connector_id, at} fractions. */
+export function connectorsOf(props: Record<string, unknown>): Array<{ id: string; at: number }> | undefined {
+  const raw = props.connectors;
+  if (typeof raw !== "string" || !raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as Array<{ connector_id?: unknown; at?: unknown }>;
+    if (!Array.isArray(parsed)) return undefined;
+    const out: Array<{ id: string; at: number }> = [];
+    for (const c of parsed) {
+      if (typeof c.connector_id === "string" && typeof c.at === "number" && Number.isFinite(c.at)) {
+        out.push({ id: c.connector_id, at: c.at });
+      }
+    }
+    return out.length ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function bilinearSample(data: Float32Array, w: number, h: number, u: number, v: number): number {
   const x = Math.max(0, Math.min(w - 1, u));
   const y = Math.max(0, Math.min(h - 1, v));
@@ -259,6 +293,16 @@ export function buildFixture(input: BuildFixtureInput): WorldFixtureJson {
           levels: num(props.num_floors) ?? num(props.levels),
           roof: str(props.roof_shape) || str(props["roof_shape:type"]) || undefined,
           partOf: str(props.building_id) || undefined,
+          subtype: str(props.subtype) || str(props.class) || undefined,
+          facadeColor: str(props.facade_color) || undefined,
+          facadeMaterial: str(props.facade_material) || undefined,
+          roofColor: str(props.roof_color) || undefined,
+          roofMaterial: str(props.roof_material) || undefined,
+          roofHeight: num(props.roof_height),
+          roofOrientation: str(props.roof_orientation) || undefined,
+          name: primaryName(props),
+          minHeight: num(props.min_height),
+          level: num(props.level),
         };
       },
     },
@@ -276,7 +320,14 @@ export function buildFixture(input: BuildFixtureInput): WorldFixtureJson {
         } else {
           surface = str(rawSurface);
         }
-        return { id: str(props.id), cls: str(props.class), surface: surface || undefined };
+        return {
+          id: str(props.id),
+          cls: str(props.class),
+          surface: surface || undefined,
+          subtype: str(props.subtype) || undefined,
+          name: primaryName(props),
+          connectors: connectorsOf(props),
+        };
       },
       keep: (item) => ROAD_CLASSES.has(str(item.props.class)),
     },
@@ -358,6 +409,17 @@ export function buildFixture(input: BuildFixtureInput): WorldFixtureJson {
         if (extra.partOf !== undefined) f.partOf = extra.partOf;
         if (extra.surface !== undefined) f.surface = extra.surface;
         if (extra.cls !== undefined) f.class = extra.cls;
+        if (extra.subtype !== undefined) f.subtype = extra.subtype;
+        if (extra.facadeColor !== undefined) f.facadeColor = extra.facadeColor;
+        if (extra.facadeMaterial !== undefined) f.facadeMaterial = extra.facadeMaterial;
+        if (extra.roofColor !== undefined) f.roofColor = extra.roofColor;
+        if (extra.roofMaterial !== undefined) f.roofMaterial = extra.roofMaterial;
+        if (extra.roofHeight !== undefined) f.roofHeight = extra.roofHeight;
+        if (extra.roofOrientation !== undefined) f.roofOrientation = extra.roofOrientation;
+        if (extra.name !== undefined) f.name = extra.name;
+        if (extra.minHeight !== undefined) f.minHeight = extra.minHeight;
+        if (extra.level !== undefined) f.level = extra.level;
+        if (extra.connectors !== undefined) f.connectors = extra.connectors;
         return f;
       });
       const sorted = sortByFeatureId(features as Array<{ id: string }>);
