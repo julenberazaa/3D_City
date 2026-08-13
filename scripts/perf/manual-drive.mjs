@@ -22,6 +22,7 @@ const SCENARIOS = {
   "dense-urban": { url: `${BASE}/?bbox=-74.015,40.700,-73.960,40.735`, min: { secs: 90, dist: 500 }, label: "Manhattan (dense urban)" },
   "mountain": { url: `${BASE}/?bbox=7.73,45.99,7.78,46.03`, min: { secs: 90, dist: 500 }, label: "Zermatt (mountainous)" },
   "water": { url: `${BASE}/?fixture=sf-downtown`, min: { secs: 60, dist: 400 }, label: "SF downtown fixture (water visible)" },
+  "owner-bbox": { url: `${BASE}/?bbox=-3.2424,43.3609,-3.1984,43.4049`, min: { secs: 90, dist: 500 }, label: "Owner bbox (Santander, Spain)" },
 };
 
 const DURATION_MS = 20 * 60 * 1000;

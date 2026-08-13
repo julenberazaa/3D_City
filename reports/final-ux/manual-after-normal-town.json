@@ -2,18 +2,18 @@
   "scenario": "normal-town",
   "label": "Zurich (normal town)",
   "url": "http://localhost:4173/?bbox=8.49,47.34,8.55,47.39",
-  "drivenM": 807,
-  "durationS": 202,
-  "recoveries": 3,
+  "drivenM": 801,
+  "durationS": 395,
+  "recoveries": 0,
   "teleports": [],
-  "steeringEvents": 92,
-  "fpsMedian": 161,
+  "steeringEvents": 218,
+  "fpsMedian": 164,
   "frameMs": {
-    "p95": 18,
-    "p99": 18.3
+    "p95": 6.6,
+    "p99": 12.1
   },
-  "severeStalls250ms": 5,
-  "longestFrameMs": 14971,
+  "severeStalls250ms": 0,
+  "longestFrameMs": 49,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/after-normal-town-spawn.png",
