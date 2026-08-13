@@ -34,9 +34,9 @@ export const MAX_LABELS_PER_CHUNK = 10;
 /** Apparent-size targets (world units at 1 m distance scale to 768 px on the
  *  55° FOV viewport): keep labels readable at gameplay distances without
  *  ballooning when the camera is close. Applied per-frame to billboards. */
-export const LABEL_TARGET_PX = 170;
-export const LABEL_MIN_WORLD = 7;
-export const LABEL_MAX_WORLD = 22;
+export const LABEL_TARGET_PX = 240;
+export const LABEL_MIN_WORLD = 12;
+export const LABEL_MAX_WORLD = 26;
 
 function makeTexture(name: string): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");

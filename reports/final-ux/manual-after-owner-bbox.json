@@ -2,18 +2,18 @@
   "scenario": "owner-bbox",
   "label": "Owner bbox (Santander, Spain)",
   "url": "http://localhost:4173/?bbox=-3.2424,43.3609,-3.1984,43.4049",
-  "drivenM": 809,
+  "drivenM": 564,
   "durationS": 91,
-  "recoveries": 1,
+  "recoveries": 3,
   "teleports": [],
-  "steeringEvents": 51,
+  "steeringEvents": 49,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.4,
-    "p99": 7.1
+    "p95": 12.1,
+    "p99": 12.4
   },
   "severeStalls250ms": 0,
-  "longestFrameMs": 188,
+  "longestFrameMs": 127,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/after-owner-bbox-spawn.png",

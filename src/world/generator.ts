@@ -1119,14 +1119,11 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
   // spacing; per-chunk name dedup + chunk-edge margin avoid duplicates.
   const rRec = fixture.roads.find((c) => c.x === x && c.y === y);
   if (rRec) {
-    const chunkSpan = fixture.manifest.chunkSize as number;
-    const halfSpan = chunkSpan / 2;
-    const edgeMargin = 120;
-    const farFromEdge = (px: number, pz: number): boolean => {
-      const dx = Math.min(px + halfSpan, halfSpan - px);
-      const dz = Math.min(pz + halfSpan, halfSpan - pz);
-      return dx > edgeMargin && dz > edgeMargin;
-    };
+    // Per-chunk name dedup is the duplicate guard (same street's split
+    // segments share a name); adjacent chunks labeling the same long road end
+    // up ~1 chunk apart — acceptable spacing. No chunk-edge margin: roads
+    // legitimately cross z15 chunk edges constantly, and the margin rejected
+    // nearly every label.
     const named: Array<{ name: string; x: number; z: number; prio: number; len: number }> = [];
     const seen = new Set<string>();
     for (const f of rRec.features) {
@@ -1157,7 +1154,6 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
       const addLabelAt = (i: number, t: number): void => {
         const px = roadLine[i]![0] + (roadLine[i + 1]![0] - roadLine[i]![0]) * t;
         const pz = roadLine[i]![1] + (roadLine[i + 1]![1] - roadLine[i]![1]) * t;
-        if (!farFromEdge(px, pz)) return;
         named.push({ name: roadName, x: px, z: pz, prio, len: roadName.length });
       };
       addLabelAt(best, 0.5);
@@ -1172,7 +1168,7 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
               const t = (target - cum) / Math.max(1e-9, l);
               const px = f.line[i]![0] + (f.line[i + 1]![0] - f.line[i]![0]) * t;
               const pz = f.line[i]![1] + (f.line[i + 1]![1] - f.line[i]![1]) * t;
-              if (farFromEdge(px, pz) && Math.hypot(px - named[named.length - 1]!.x, pz - named[named.length - 1]!.z) > 200) {
+              if (Math.hypot(px - named[named.length - 1]!.x, pz - named[named.length - 1]!.z) > 200) {
                 named.push({ name: f.name, x: px, z: pz, prio, len: f.name.length });
               }
               return;
