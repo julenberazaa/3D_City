@@ -1,90 +1,24 @@
 {
-  "normal-town": {
-    "scenario": "normal-town",
-    "label": "Zurich (normal town)",
-    "url": "http://localhost:4173/?bbox=8.49,47.34,8.55,47.39",
-    "drivenM": 807,
-    "durationS": 202,
-    "recoveries": 3,
-    "teleports": [],
-    "steeringEvents": 92,
-    "fpsMedian": 161,
-    "frameMs": {
-      "p95": 18,
-      "p99": 18.3
-    },
-    "severeStalls250ms": 5,
-    "longestFrameMs": 14971,
-    "consoleErrors": [],
-    "evidence": [
-      "reports/visual/final-ux/after-normal-town-spawn.png",
-      "reports/visual/final-ux/after-normal-town-drive.png"
-    ]
-  },
   "dense-urban": {
     "scenario": "dense-urban",
     "label": "Manhattan (dense urban)",
     "url": "http://localhost:4173/?bbox=-74.015,40.700,-73.960,40.735",
-    "drivenM": 501,
-    "durationS": 294,
-    "recoveries": 1,
+    "drivenM": 502,
+    "durationS": 124,
+    "recoveries": 2,
     "teleports": [],
-    "steeringEvents": 168,
-    "fpsMedian": 164,
+    "steeringEvents": 69,
+    "fpsMedian": 125,
     "frameMs": {
-      "p95": 6.2,
-      "p99": 6.6
+      "p95": 9,
+      "p99": 16
     },
-    "severeStalls250ms": 0,
-    "longestFrameMs": 18,
+    "severeStalls250ms": 2,
+    "longestFrameMs": 2272,
     "consoleErrors": [],
     "evidence": [
       "reports/visual/final-ux/after-dense-urban-spawn.png",
       "reports/visual/final-ux/after-dense-urban-drive.png"
-    ]
-  },
-  "mountain": {
-    "scenario": "mountain",
-    "label": "Zermatt (mountainous)",
-    "url": "http://localhost:4173/?bbox=7.73,45.99,7.78,46.03",
-    "drivenM": 501,
-    "durationS": 161,
-    "recoveries": 2,
-    "teleports": [],
-    "steeringEvents": 94,
-    "fpsMedian": 164,
-    "frameMs": {
-      "p95": 6.2,
-      "p99": 6.5
-    },
-    "severeStalls250ms": 0,
-    "longestFrameMs": 30,
-    "consoleErrors": [],
-    "evidence": [
-      "reports/visual/final-ux/after-mountain-spawn.png",
-      "reports/visual/final-ux/after-mountain-drive.png"
-    ]
-  },
-  "water": {
-    "scenario": "water",
-    "label": "SF downtown fixture (water visible)",
-    "url": "http://localhost:4173/?fixture=sf-downtown",
-    "drivenM": 504,
-    "durationS": 60,
-    "recoveries": 1,
-    "teleports": [],
-    "steeringEvents": 32,
-    "fpsMedian": 164,
-    "frameMs": {
-      "p95": 6.2,
-      "p99": 6.3
-    },
-    "severeStalls250ms": 1,
-    "longestFrameMs": 2442,
-    "consoleErrors": [],
-    "evidence": [
-      "reports/visual/final-ux/after-water-spawn.png",
-      "reports/visual/final-ux/after-water-drive.png"
     ]
   }
 }
