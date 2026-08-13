@@ -93,22 +93,6 @@ function covered(px: number, pz: number, cells: Map<number, Tri2D[]>, tol: numbe
   return false;
 }
 
-/** Color of the covering road triangle at (px,pz), or null when uncovered. */
-function colorAt(px: number, pz: number, cells: Map<number, Tri2D[]>): { r: number; g: number; b: number } | null {
-  const cx = Math.floor(px / 8);
-  const cz = Math.floor(pz / 8);
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      const list = cells.get(cx * 100000 + cz + dx * 100000 + dz);
-      if (!list) continue;
-      for (const t of list) {
-        if (pointInTri(px, pz, t)) return { r: t.r, g: t.g, b: t.b };
-      }
-    }
-  }
-  return null;
-}
-
 /** Mirror of the generator's per-chunk junction rule (features grouped by
  *  chunk: junctions whose segments live in different chunks are invisible to
  *  each chunk and therefore correctly get NO cap — ribbons continue). */
