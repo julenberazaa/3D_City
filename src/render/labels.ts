@@ -14,7 +14,7 @@ export interface RoadLabel {
   scale: number;
 }
 
-const LABEL_PRIORITY: Record<string, number> = {
+export const LABEL_PRIORITY: Record<string, number> = {
   motorway: 6,
   trunk: 5,
   primary: 4,
@@ -30,6 +30,13 @@ export function labelPriorityOf(cls: string): number {
 }
 
 export const MAX_LABELS_PER_CHUNK = 10;
+
+/** Apparent-size targets (world units at 1 m distance scale to 768 px on the
+ *  55° FOV viewport): keep labels readable at gameplay distances without
+ *  ballooning when the camera is close. Applied per-frame to billboards. */
+export const LABEL_TARGET_PX = 170;
+export const LABEL_MIN_WORLD = 7;
+export const LABEL_MAX_WORLD = 22;
 
 function makeTexture(name: string): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -71,9 +78,34 @@ export function createLabelSprite(label: RoadLabel): THREE.Sprite {
   const sprite = new THREE.Sprite(material);
   sprite.position.set(label.x, label.y, label.z);
   const aspect = Math.min(4, Math.max(1.4, label.name.length * 0.6));
-  // Labels must be READABLE while driving: generous world size and a taller
-  // hover height so buildings along the street don't swallow them.
   sprite.scale.set(label.scale, (label.scale / aspect) * 0.62, 1);
   sprite.renderOrder = 10;
+  // Per-frame apparent-size clamp (see updateLabelScales): the base scale is
+  // the label's native width at the reference distance.
+  sprite.userData.roadLabel = true;
+  sprite.userData.baseScale = label.scale;
+  sprite.userData.aspect = aspect;
   return sprite;
+}
+
+const PX_PER_WORLD_AT_1M = 768;
+
+/**
+ * Bounded apparent-size clamp for street labels: each label's world width is
+ * scaled so it stays readable (>= LABEL_TARGET_PX of screen) but never grows
+ * beyond LABEL_MAX_WORLD when the camera is close. Labels stay attached to
+ * their street — this only adjusts size, never position.
+ */
+export function updateLabelScales(scene: THREE.Scene, camera: THREE.Camera): void {
+  for (const group of scene.children) {
+    if (!(group as THREE.Group).isGroup) continue;
+    for (const child of group.children) {
+      const u = child.userData as { roadLabel?: boolean; baseScale?: number; aspect?: number };
+      if (!u.roadLabel || !u.baseScale || !u.aspect) continue;
+      const d = camera.position.distanceTo(child.position);
+      const target = (LABEL_TARGET_PX * d) / PX_PER_WORLD_AT_1M;
+      const w = Math.min(LABEL_MAX_WORLD, Math.max(LABEL_MIN_WORLD, target));
+      child.scale.set(w, (w / u.aspect) * 0.62, 1);
+    }
+  }
 }

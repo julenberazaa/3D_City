@@ -16,6 +16,7 @@ import { z15Grid } from "./data/fixtureBuilder";
 import { buildGazetteerIndex, searchGazetteer, type GazetteerEntry } from "./search/gazetteer";
 import { searchOpenMeteo } from "./search/openMeteo";
 import { startBenchmark, type BenchmarkSession } from "./bench/benchmark";
+import { updateLabelScales } from "./render/labels";
 
 export const DEMO_BBOX = "-122.425,37.767,-122.396,37.792";
 const MAX_LIVE_CHUNKS = 64;
@@ -466,6 +467,9 @@ async function boot(): Promise<void> {
         orbit.camera.position.copy(camSmooth);
         orbit.camera.lookAt(lookSmooth);
       }
+      // Street labels: bounded apparent-size clamp (readable at gameplay
+      // distance, never oversized up close). Cost: ~100 sprite distance checks.
+      updateLabelScales(render.scene, orbit.camera);
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

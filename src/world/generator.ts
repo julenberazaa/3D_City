@@ -594,7 +594,7 @@ function buildRoadChunkMesh(
   c: ChunkRecord,
   terrain: ChunkTerrain[],
   waterRings: number[][][],
-): { mesh: THREE.Mesh | null; count: number } {
+): { mesh: THREE.Mesh | null; count: number; stats: RoadMeshStats } {
   const vb = new VertexBuilder();
   let count = 0;
 
@@ -688,25 +688,34 @@ function buildRoadChunkMesh(
   // junctions of the SAME class and roughly collinear segments are NOT real
   // intersections — they would cap every ~80 m of a straight street (the
   // "beaded road" artifact). Such junctions get no cap and no trim.
-  for (const j of junctions.values()) {
+  // Direction uses each segment's OWN connector `at` flag (robust to rounded
+  // endpoint coordinates), not position matching.
+  const dirAtJunction = (f: FixtureFeature, jid: string): [number, number] | null => {
+    const line = f.line;
+    if (!line || line.length < 2) return null;
+    const ref = (f.connectors ?? []).find((c) => c.id === jid);
+    const fromStart = ref ? ref.at <= 0.5 : true;
+    if (fromStart) return normalize2(line[1]![0] - line[0]![0], line[1]![1] - line[0]![1]);
+    const p = line[line.length - 1]!;
+    return normalize2(p[0] - line[line.length - 2]![0], p[1] - line[line.length - 2]![1]);
+  };
+  for (const [jid, j] of junctions) {
     if (j.features.length !== 2) continue;
     const [a, b] = j.features;
     if ((a.f.class ?? "") !== (b.f.class ?? "")) continue;
-    const dirAt = (f: FixtureFeature, jx: number, jz: number): [number, number] | null => {
-      const line = f.line;
-      if (!line || line.length < 2) return null;
-      if (Math.abs(line[0]![0] - jx) < 1e-6 && Math.abs(line[0]![1] - jz) < 1e-6) {
-        return normalize2(line[1]![0] - line[0]![0], line[1]![1] - line[0]![1]);
-      }
-      const p = line[line.length - 1]!;
-      return normalize2(p[0] - line[line.length - 2]![0], p[1] - line[line.length - 2]![1]);
-    };
-    const d1 = dirAt(a.f, j.x, j.z);
-    const d2 = dirAt(b.f, j.x, j.z);
+    const d1 = dirAtJunction(a.f, jid);
+    const d2 = dirAtJunction(b.f, jid);
     if (d1 && d2) {
       const dot = Math.abs(d1[0] * d2[0] + d1[1] * d2[1]);
       if (dot >= 0.9) j.passThrough = true;
     }
+  }
+  let passThroughCount = 0;
+  let realJunctionCount = 0;
+  for (const j of junctions.values()) {
+    if (j.features.length < 2) continue;
+    if (j.passThrough) passThroughCount++;
+    else realJunctionCount++;
   }
 
   // Trim ribbons to their junction radii (clamped so short segments between
@@ -762,15 +771,17 @@ function buildRoadChunkMesh(
       else vb.tri(vctr, vc, va);
     }
   };
+  let caps = 0;
   for (const j of junctions.values()) {
     if (j.features.length < 2 || j.passThrough) continue;
     const y = (bridgeY(j.x, j.z) ?? yAt(j.x, j.z)) + SURFACE_Y;
     capFan(j.x, j.z, j.radius + 0.35, CURB_COLOR, y - (SURFACE_Y - CURB_Y));
     capFan(j.x, j.z, j.radius, ROAD_SURFACE, y);
     count += 2;
+    caps += 2;
   }
 
-  return { mesh: vb.toMesh(ROAD_MATERIAL), count };
+  return { mesh: vb.toMesh(ROAD_MATERIAL), count, stats: { caps, passThrough: passThroughCount, realJunctions: realJunctionCount } };
 }
 
 interface BuildingParts {
@@ -1034,10 +1045,20 @@ function buildTreeChunkExtras(
   return placed > 0 ? group : null;
 }
 
+export interface RoadMeshStats {
+  /** Junction caps emitted (surface + curb ring each count as one cap). */
+  caps: number;
+  /** 2-way collinear splits suppressed as pass-through (no cap/trim). */
+  passThrough: number;
+  /** Non-pass-through junctions that legitimately keep caps. */
+  realJunctions: number;
+}
+
 export interface ChunkBuildResult {
   group: THREE.Group;
   counts: { buildings: number; roads: number; waterPolys: number; landcover: number };
   provenance: WorldProvenance;
+  roadStats: RoadMeshStats;
 }
 
 /** Build the render group for ONE z15 chunk (terrain+roads+water+landcover+buildings). */
@@ -1058,6 +1079,7 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
   const group = new THREE.Group();
   const counts = { buildings: 0, roads: 0, waterPolys: 0, landcover: 0 };
   const provenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
+  const roadStats: RoadMeshStats = { caps: 0, passThrough: 0, realJunctions: 0 };
 
   const terrain = fixture.terrain.find((c) => c.x === x && c.y === y);
   if (terrain) {
@@ -1076,15 +1098,35 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
     counts[countKey] += count;
     if (mesh) group.add(mesh);
   };
-  addChunk(fixture.roads, (c) => buildRoadChunkMesh(c, fixture.terrain, waterRingsOf(fixture)), "roads");
+  const rRec0 = fixture.roads.find((c) => c.x === x && c.y === y);
+  if (rRec0) {
+    const built = buildRoadChunkMesh(rRec0, fixture.terrain, waterRingsOf(fixture));
+    counts.roads += built.count;
+    roadStats.caps += built.stats.caps;
+    roadStats.passThrough += built.stats.passThrough;
+    roadStats.realJunctions += built.stats.realJunctions;
+    if (built.mesh) group.add(built.mesh);
+  }
   yield;
   addChunk(fixture.water, (c) => buildWaterChunkMesh(c), "waterPolys");
   yield;
   addChunk(fixture.landcover, (c) => buildLandcoverChunkMesh(c, fixture.terrain), "landcover");
   yield;
-  // Street labels (named vehicular roads, class-prioritized, density-capped).
+  // Street labels: ON-ROAD map-like placement (owner decision). Each label
+  // sits at the midpoint of the road's LONGEST segment — away from junction
+  // centers — at a small offset above the surface (no floating billboards).
+  // Class-prioritized + density-capped; very long roads may repeat with strict
+  // spacing; per-chunk name dedup + chunk-edge margin avoid duplicates.
   const rRec = fixture.roads.find((c) => c.x === x && c.y === y);
   if (rRec) {
+    const chunkSpan = fixture.manifest.chunkSize as number;
+    const halfSpan = chunkSpan / 2;
+    const edgeMargin = 120;
+    const farFromEdge = (px: number, pz: number): boolean => {
+      const dx = Math.min(px + halfSpan, halfSpan - px);
+      const dz = Math.min(pz + halfSpan, halfSpan - pz);
+      return dx > edgeMargin && dz > edgeMargin;
+    };
     const named: Array<{ name: string; x: number; z: number; prio: number; len: number }> = [];
     const seen = new Set<string>();
     for (const f of rRec.features) {
@@ -1092,35 +1134,64 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
       if (!f.name || seen.has(f.name)) continue;
       const prio = labelPriorityOf(f.class ?? "");
       if (prio < 1) continue;
-      seen.add(f.name);
-      let cum = 0;
-      let mid = 0;
-      for (let i = 0; i < f.line.length - 1; i++) {
-        mid += Math.hypot(f.line[i + 1]![0] - f.line[i]![0], f.line[i + 1]![1] - f.line[i]![1]);
-      }
-      const half = mid / 2;
-      for (let i = 0; i < f.line.length - 1; i++) {
-        const seg = Math.hypot(f.line[i + 1]![0] - f.line[i]![0], f.line[i + 1]![1] - f.line[i]![1]);
-        if (cum + seg >= half) {
-          const t = (half - cum) / Math.max(1e-9, seg);
-          named.push({
-            name: f.name,
-            x: f.line[i]![0] + (f.line[i + 1]![0] - f.line[i]![0]) * t,
-            z: f.line[i]![1] + (f.line[i + 1]![1] - f.line[i]![1]) * t,
-            prio,
-            len: f.name.length,
-          });
-          break;
+      const line = f.line;
+      const segLenAt = (i: number) => Math.hypot(line[i + 1]![0] - line[i]![0], line[i + 1]![1] - line[i]![1]);
+      const totalLen = (() => {
+        let l = 0;
+        for (let i = 0; i < line.length - 1; i++) l += segLenAt(i);
+        return l;
+      })();
+      // Longest segment (>=10 m preferred; otherwise the feature is a stub).
+      let best = -1;
+      let bestLen = -1;
+      for (let i = 0; i < line.length - 1; i++) {
+        const l = segLenAt(i);
+        if (l > bestLen) {
+          bestLen = l;
+          best = i;
         }
-        cum += seg;
       }
+      if (best < 0 || bestLen < 8) continue;
+      const roadName = f.name;
+      const roadLine = line;
+      const addLabelAt = (i: number, t: number): void => {
+        const px = roadLine[i]![0] + (roadLine[i + 1]![0] - roadLine[i]![0]) * t;
+        const pz = roadLine[i]![1] + (roadLine[i + 1]![1] - roadLine[i]![1]) * t;
+        if (!farFromEdge(px, pz)) return;
+        named.push({ name: roadName, x: px, z: pz, prio, len: roadName.length });
+      };
+      addLabelAt(best, 0.5);
+      // Very long roads: one repeat at >=200 m from the first label.
+      if (totalLen > 400 && bestLen < totalLen - 200) {
+        const second = (() => {
+          let cum = 0;
+          const target = Math.min(totalLen - 60, bestLen + 200);
+          for (let i = 0; i < f.line.length - 1; i++) {
+            const l = segLenAt(i);
+            if (cum + l >= target) {
+              const t = (target - cum) / Math.max(1e-9, l);
+              const px = f.line[i]![0] + (f.line[i + 1]![0] - f.line[i]![0]) * t;
+              const pz = f.line[i]![1] + (f.line[i + 1]![1] - f.line[i]![1]) * t;
+              if (farFromEdge(px, pz) && Math.hypot(px - named[named.length - 1]!.x, pz - named[named.length - 1]!.z) > 200) {
+                named.push({ name: f.name, x: px, z: pz, prio, len: f.name.length });
+              }
+              return;
+            }
+            cum += l;
+          }
+        })();
+        void second;
+      }
+      seen.add(f.name);
     }
     named.sort((a, b) => b.prio - a.prio || a.len - b.len);
-    for (const n of named.slice(0, MAX_LABELS_PER_CHUNK)) {
-      // Tall hover height + generous scale keep labels readable above the
-      // building base while driving (readability fix).
-      const y = sampleTerrain(fixture.terrain, n.x, n.z) + 8;
-      group.add(createLabelSprite({ name: n.name, x: n.x, z: n.z, y, scale: Math.min(18, 1.8 + n.len * 1.1) }));
+    if (typeof document !== "undefined") {
+      for (const n of named.slice(0, MAX_LABELS_PER_CHUNK)) {
+        // Small vertical offset only: clear of the surface plane, never floating
+        // above the street (owner decision: on-street labels).
+        const y = sampleTerrain(fixture.terrain, n.x, n.z) + 0.6;
+        group.add(createLabelSprite({ name: n.name, x: n.x, z: n.z, y, scale: Math.min(20, 2.2 + n.len * 1.15) }));
+      }
     }
   }
   yield;
@@ -1149,7 +1220,7 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
     if (mesh) group.add(mesh);
   }
   yield;
-  return { group, counts, provenance };
+  return { group, counts, provenance, roadStats };
 }
 
 /**
@@ -1173,11 +1244,11 @@ export function buildWorld(fixture: WorldFixture): WorldModel {
   const provenance: WorldProvenance = { observed: 0, derived: 0, inferred: 0 };
 
   for (const c of fixture.roads) {
-    const { mesh, count } = buildRoadChunkMesh(c, fixture.terrain, waterRingsOf(fixture));
-    counts.roads += count;
-    if (mesh) {
+    const built = buildRoadChunkMesh(c, fixture.terrain, waterRingsOf(fixture));
+    counts.roads += built.count;
+    if (built.mesh) {
       const group = new THREE.Group();
-      group.add(mesh);
+      group.add(built.mesh);
       roadGroups.set(chunkKey(c.z, c.x, c.y), group);
     }
   }
