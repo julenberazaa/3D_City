@@ -1,19 +1,19 @@
 {
   "scenario": "water",
   "label": "SF downtown fixture (water visible)",
-  "url": "http://localhost:4174/?fixture=sf-downtown",
-  "drivenM": 401,
-  "durationS": 223,
-  "recoveries": 8,
+  "url": "https://julenberazaa.github.io/3D_City/?fixture=sf-downtown",
+  "drivenM": 494,
+  "durationS": 60,
+  "recoveries": 1,
   "teleports": [],
-  "steeringEvents": 116,
+  "steeringEvents": 38,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.2,
-    "p99": 6.3
+    "p95": 6.3,
+    "p99": 6.5
   },
-  "severeStalls250ms": 8,
-  "longestFrameMs": 3974,
+  "severeStalls250ms": 1,
+  "longestFrameMs": 1939,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/before-water-spawn.png",

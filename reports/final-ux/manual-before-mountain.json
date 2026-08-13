@@ -1,19 +1,19 @@
 {
   "scenario": "mountain",
   "label": "Zermatt (mountainous)",
-  "url": "http://localhost:4174/?bbox=7.73,45.99,7.78,46.03",
-  "drivenM": 503,
-  "durationS": 122,
+  "url": "https://julenberazaa.github.io/3D_City/?bbox=7.73,45.99,7.78,46.03",
+  "drivenM": 540,
+  "durationS": 90,
   "recoveries": 1,
   "teleports": [],
-  "steeringEvents": 73,
+  "steeringEvents": 58,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.2,
-    "p99": 6.3
+    "p95": 6.3,
+    "p99": 6.6
   },
   "severeStalls250ms": 0,
-  "longestFrameMs": 61,
+  "longestFrameMs": 30,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/before-mountain-spawn.png",

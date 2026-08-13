@@ -37,21 +37,21 @@ function makeTexture(name: string): THREE.CanvasTexture {
   canvas.height = 64;
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, 256, 64);
-  ctx.font = "600 36px system-ui, -apple-system, sans-serif";
-  const w = Math.min(240, ctx.measureText(name).width + 28);
-  ctx.fillStyle = "rgba(14, 18, 22, 0.78)";
-  const h = 44;
+  ctx.font = "600 44px system-ui, -apple-system, sans-serif";
+  const w = Math.min(244, ctx.measureText(name).width + 24);
+  ctx.fillStyle = "rgba(14, 18, 22, 0.8)";
+  const h = 50;
   const rx = (256 - w) / 2;
   ctx.beginPath();
   ctx.roundRect(rx, (64 - h) / 2, w, h, 12);
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
   ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = "rgba(14, 18, 22, 0.9)";
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "rgba(14, 18, 22, 0.95)";
   ctx.strokeText(name, 128, 33);
   ctx.fillStyle = "#ffffff";
   ctx.fillText(name, 128, 33);
@@ -70,8 +70,10 @@ export function createLabelSprite(label: RoadLabel): THREE.Sprite {
   });
   const sprite = new THREE.Sprite(material);
   sprite.position.set(label.x, label.y, label.z);
-  const aspect = Math.min(3.6, Math.max(1.1, label.name.length * 0.55));
-  sprite.scale.set(label.scale, (label.scale / aspect) * 0.55, 1);
+  const aspect = Math.min(4, Math.max(1.4, label.name.length * 0.6));
+  // Labels must be READABLE while driving: generous world size and a taller
+  // hover height so buildings along the street don't swallow them.
+  sprite.scale.set(label.scale, (label.scale / aspect) * 0.62, 1);
   sprite.renderOrder = 10;
   return sprite;
 }

@@ -1,22 +1,20 @@
 {
   "scenario": "normal-town",
   "label": "Zurich (normal town)",
-  "url": "http://localhost:4174/?bbox=8.49,47.34,8.55,47.39",
-  "drivenM": 801,
-  "durationS": 155,
-  "recoveries": 4,
+  "url": "https://julenberazaa.github.io/3D_City/?bbox=8.49,47.34,8.55,47.39",
+  "drivenM": 800,
+  "durationS": 404,
+  "recoveries": 1,
   "teleports": [],
-  "steeringEvents": 59,
+  "steeringEvents": 228,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.2,
-    "p99": 6.4
+    "p95": 7.2,
+    "p99": 12.2
   },
-  "severeStalls250ms": 4,
-  "longestFrameMs": 14468,
-  "consoleErrors": [
-    "Failed to load resource: the server responded with a status of 404 (Not Found)"
-  ],
+  "severeStalls250ms": 0,
+  "longestFrameMs": 36,
+  "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/before-normal-town-spawn.png",
     "reports/visual/final-ux/before-normal-town-drive.png"

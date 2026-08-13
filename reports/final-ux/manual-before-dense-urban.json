@@ -1,19 +1,19 @@
 {
   "scenario": "dense-urban",
   "label": "Manhattan (dense urban)",
-  "url": "http://localhost:4174/?bbox=-74.015,40.700,-73.960,40.735",
-  "drivenM": 503,
-  "durationS": 122,
-  "recoveries": 4,
+  "url": "https://julenberazaa.github.io/3D_City/?bbox=-74.015,40.700,-73.960,40.735",
+  "drivenM": 769,
+  "durationS": 90,
+  "recoveries": 3,
   "teleports": [],
-  "steeringEvents": 59,
+  "steeringEvents": 49,
   "fpsMedian": 164,
   "frameMs": {
-    "p95": 6.2,
-    "p99": 6.4
+    "p95": 12.2,
+    "p99": 12.7
   },
   "severeStalls250ms": 4,
-  "longestFrameMs": 5174,
+  "longestFrameMs": 1575,
   "consoleErrors": [],
   "evidence": [
     "reports/visual/final-ux/before-dense-urban-spawn.png",

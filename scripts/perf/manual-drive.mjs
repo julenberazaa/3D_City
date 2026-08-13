@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url)) + "/../..";
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const SHOT_DIR = join(ROOT, "reports", "visual", "final-ux", process.argv[2] === "after" ? "after" : "before");
+const MODES = new Set(["before", "after", "deployed"]);
+const mode = process.argv[2];
+if (!MODES.has(mode)) {
+  console.error(`usage: node scripts/perf/manual-drive.mjs <before|after|deployed> [scenario]`);
+  process.exit(1);
+}
+const SHOT_DIR = join(ROOT, "reports", "visual", "final-ux", mode);
 const OUT = join(ROOT, "reports", "final-ux");
 mkdirSync(SHOT_DIR, { recursive: true });
 mkdirSync(OUT, { recursive: true });
@@ -46,21 +52,25 @@ async function runScenario(browser, name, cfg, tag) {
     throw new Error(`boot failed; status=${statusText}`);
   }
   // Wait for actual rendered pixels (chunk build is async; "Ready" precedes
-  // the first frame): poll center + lower-third until they are not fog/sky.
+  // the first frame): require BOTH center and lower-third to be non-fog, then
+  // give the world a moment to build before shooting (first network visits are
+  // slower than cached previews).
   await page.waitForFunction(() => {
     const c = document.querySelector("canvas");
     if (!c) return false;
     const ctx = c.getContext("webgl2");
     if (!ctx) return false;
-    const x = Math.floor(c.width * 0.5);
-    const y = Math.floor(c.height * 0.45);
-    const px = new Uint8Array(4);
-    ctx.readPixels(x, y, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
-    return px[3] > 0 && (px[0] > 12 || px[1] > 12 || px[2] > 12);
+    const px = (fx, fy) => {
+      const out = new Uint8Array(4);
+      ctx.readPixels(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, out);
+      return out;
+    };
+    const notFog = (p) => p[3] > 0 && (p[0] > 12 || p[1] > 12 || p[2] > 12);
+    return notFog(px(0.5, 0.45)) && notFog(px(0.5, 0.2));
   }, { timeout: 60000 }).catch(() => {
     // Even a sky frame is fine after the cap — the shot is best-effort.
   });
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(4000);
   await page.screenshot({ path: join(SHOT_DIR, `${tag}-${name}-spawn.png`) });
 
   await page.evaluate(() => {
@@ -168,7 +178,7 @@ async function runScenario(browser, name, cfg, tag) {
   return record;
 }
 
-const tag = process.argv[2] === "after" ? "after" : "before";
+const tag = mode;
 const only = process.argv[3];
 const browser = await chromium.launch({ headless: true, executablePath: CHROME });
 const results = {};

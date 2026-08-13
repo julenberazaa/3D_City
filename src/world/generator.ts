@@ -187,6 +187,8 @@ interface RoadJunction {
   z: number;
   radius: number;
   features: Array<{ f: FixtureFeature; width: number }>;
+  /** 2-way split of the same collinear road: pass-through, no cap/trim. */
+  passThrough?: boolean;
 }
 
 function normalize2(dx: number, dz: number): [number, number] | null {
@@ -682,6 +684,31 @@ function buildRoadChunkMesh(
     }
   }
 
+  // Pass-through detection: OSM splits every way at its nodes, so 2-way
+  // junctions of the SAME class and roughly collinear segments are NOT real
+  // intersections — they would cap every ~80 m of a straight street (the
+  // "beaded road" artifact). Such junctions get no cap and no trim.
+  for (const j of junctions.values()) {
+    if (j.features.length !== 2) continue;
+    const [a, b] = j.features;
+    if ((a.f.class ?? "") !== (b.f.class ?? "")) continue;
+    const dirAt = (f: FixtureFeature, jx: number, jz: number): [number, number] | null => {
+      const line = f.line;
+      if (!line || line.length < 2) return null;
+      if (Math.abs(line[0]![0] - jx) < 1e-6 && Math.abs(line[0]![1] - jz) < 1e-6) {
+        return normalize2(line[1]![0] - line[0]![0], line[1]![1] - line[0]![1]);
+      }
+      const p = line[line.length - 1]!;
+      return normalize2(p[0] - line[line.length - 2]![0], p[1] - line[line.length - 2]![1]);
+    };
+    const d1 = dirAt(a.f, j.x, j.z);
+    const d2 = dirAt(b.f, j.x, j.z);
+    if (d1 && d2) {
+      const dot = Math.abs(d1[0] * d2[0] + d1[1] * d2[1]);
+      if (dot >= 0.9) j.passThrough = true;
+    }
+  }
+
   // Trim ribbons to their junction radii (clamped so short segments between
   // junctions never vanish) and emit passes.
   const segLen = (pts: number[][]): number => {
@@ -694,7 +721,7 @@ function buildRoadChunkMesh(
     const totalLen = segLen(s.pts);
     for (const conn of s.connectors ?? []) {
       const j = junctions.get(conn.id);
-      if (!j || j.features.length < 2) continue;
+      if (!j || j.features.length < 2 || j.passThrough) continue;
       const fromStart = conn.at <= 0.5;
       const budget = Math.max(0, (totalLen - 1.5) / 2);
       const radius = Math.min(j.radius + (s.vehicular ? 0 : 0.2), budget);
@@ -714,26 +741,33 @@ function buildRoadChunkMesh(
     count++;
   }
 
-  // Junction caps: one polygon per junction with >=2 incident roads, sized to
-  // the largest incident half-width; fills the trimmed crossing.
-  for (const j of junctions.values()) {
-    if (j.features.length < 2) continue;
+  // Junction caps: one polygon per REAL junction (>=2 incident roads, not
+  // pass-through splits), sized to the largest incident half-width; fills the
+  // trimmed crossing. A curb ring (radius+0.35) is emitted underneath so the
+  // road's dark edge outline stays continuous through every intersection —
+  // without it the curb visually disappears at each junction (beaded road).
+  const capFan = (jx: number, jz: number, radius: number, color: number[], y: number): void => {
     const N = 10;
-    const y = (bridgeY(j.x, j.z) ?? yAt(j.x, j.z)) + SURFACE_Y;
     for (let k = 0; k < N; k++) {
       const a0 = (2 * Math.PI * k) / N;
       const a1 = (2 * Math.PI * (k + 1)) / N;
-      const p0: number[] = [j.x + Math.cos(a0) * j.radius, j.z + Math.sin(a0) * j.radius];
-      const p1: number[] = [j.x + Math.cos(a1) * j.radius, j.z + Math.sin(a1) * j.radius];
-      const va = vb.add(p0[0], y, p0[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
-      const vc = vb.add(p1[0], y, p1[1], ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
-      const vctr = vb.add(j.x, y, j.z, ROAD_SURFACE[0], ROAD_SURFACE[1], ROAD_SURFACE[2]);
+      const p0: number[] = [jx + Math.cos(a0) * radius, jz + Math.sin(a0) * radius];
+      const p1: number[] = [jx + Math.cos(a1) * radius, jz + Math.sin(a1) * radius];
+      const va = vb.add(p0[0], y, p0[1], color[0], color[1], color[2]);
+      const vc = vb.add(p1[0], y, p1[1], color[0], color[1], color[2]);
+      const vctr = vb.add(jx, y, jz, color[0], color[1], color[2]);
       // Winding guard (same convention as ribbons): fan must face up.
-      const ny = (p1[0] - j.x) * (p0[1] - j.z) - (p1[1] - j.z) * (p0[0] - j.x);
+      const ny = (p1[0] - jx) * (p0[1] - jz) - (p1[1] - jz) * (p0[0] - jx);
       if (ny >= 0) vb.tri(vctr, va, vc);
       else vb.tri(vctr, vc, va);
     }
-    count++;
+  };
+  for (const j of junctions.values()) {
+    if (j.features.length < 2 || j.passThrough) continue;
+    const y = (bridgeY(j.x, j.z) ?? yAt(j.x, j.z)) + SURFACE_Y;
+    capFan(j.x, j.z, j.radius + 0.35, CURB_COLOR, y - (SURFACE_Y - CURB_Y));
+    capFan(j.x, j.z, j.radius, ROAD_SURFACE, y);
+    count += 2;
   }
 
   return { mesh: vb.toMesh(ROAD_MATERIAL), count };
@@ -1083,8 +1117,10 @@ export function* buildChunkPieces(fixture: WorldFixture, z: number, x: number, y
     }
     named.sort((a, b) => b.prio - a.prio || a.len - b.len);
     for (const n of named.slice(0, MAX_LABELS_PER_CHUNK)) {
-      const y = sampleTerrain(fixture.terrain, n.x, n.z) + 3.2;
-      group.add(createLabelSprite({ name: n.name, x: n.x, z: n.z, y, scale: Math.min(13, 1.1 + n.len * 0.75) }));
+      // Tall hover height + generous scale keep labels readable above the
+      // building base while driving (readability fix).
+      const y = sampleTerrain(fixture.terrain, n.x, n.z) + 8;
+      group.add(createLabelSprite({ name: n.name, x: n.x, z: n.z, y, scale: Math.min(18, 1.8 + n.len * 1.1) }));
     }
   }
   yield;
